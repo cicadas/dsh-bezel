@@ -1,0 +1,6 @@
+/* The app's own name is the same in every language; the file's purpose is to
+   make the bundle declare the localization, so macOS renders the standard
+   menus (app menu, Edit, Window, Help) in the language the app picked. */
+CFBundleName = "DSH Bezel";
+CFBundleDisplayName = "DSH Bezel";
+CFBundleGetInfoString = "DSH Bezel 1.0.0, © 2026";

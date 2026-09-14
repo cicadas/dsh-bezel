@@ -11,7 +11,7 @@ struct MainView: View {
             if app.showsOnboarding {
                 OnboardingView()
             } else if let url = app.currentURL, app.attachedHost != nil {
-                WebView(url: url, reloadToken: app.reloadToken, onSignals: { app.apply($0) }) { state in
+                WebView(url: url, reloadToken: app.reloadToken) { state in
                     app.apply(state)
                 }
                 .overlay(alignment: .top) { errorBanner }
@@ -129,11 +129,28 @@ struct ConnectPrompt: View {
 
             HStack {
                 SettingsLink { Text(app.text(.menuManageHosts)) }
-                Button(app.text(.buttonConnectSelected)) { app.connectSelected() }
+                Button(app.text(app.connectButtonMessage)) { app.connectSelected() }
                     .buttonStyle(.borderedProminent)
             }
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .alert(
+            app.text(.portConflictTitle),
+            isPresented: Binding(
+                get: { app.portConflict != nil },
+                set: { if !$0 { app.dismissPortConflict() } }
+            ),
+            presenting: app.portConflict
+        ) { _ in
+            Button(app.text(.portConflictBind)) { app.bindToRunningDSH() }
+            Button(app.text(.portConflictCancel), role: .cancel) { app.dismissPortConflict() }
+        } message: { conflict in
+            Text(app.text(
+                .portConflictMessage,
+                String(conflict.port),
+                conflict.matches.first?.command ?? ""
+            ))
+        }
     }
 }

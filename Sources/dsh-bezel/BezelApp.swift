@@ -10,7 +10,10 @@ import BezelCore
 /// the thing that puts something there.
 @main
 enum BezelEntryPoint {
-    static func main() {
+    // `main` is async so the watch-feed diagnostic can await the channel on
+    // the main actor instead of blocking the main thread on a semaphore —
+    // which would deadlock the very actor it is waiting for.
+    static func main() async {
         let arguments = CommandLine.arguments
         if arguments.contains("--dump-config") {
             print(ConfigFile(url: ConfigFile.defaultURL()).describe())
@@ -20,8 +23,61 @@ enum BezelEntryPoint {
             print(hostsJSON())
             exit(0)
         }
+        if let url = watchFeedURL(from: arguments) {
+            // A diagnostic that needs no UI: spend the URL's token the way a
+            // first page load would, then attach the notification channel and
+            // print every fact it learns. Ctrl-C stops it.
+            await HostFeedCLI.run(url: url)
+            exit(0)
+        }
         mirrorLanguageIntoAppleLanguages()
         BezelApp.main()
+    }
+
+    private static func watchFeedURL(from arguments: [String]) -> URL? {
+        guard let index = arguments.firstIndex(of: "--watch-feed"),
+              arguments.count > index + 1
+        else { return nil }
+        return URL(string: arguments[index + 1])
+    }
+
+    /// The `--watch-feed` body. Lives in the app target because it prints to
+    /// stdout and owns no UI; the channel itself is all BezelCore.
+    private enum HostFeedCLI {
+        @MainActor
+        static func run(url: URL) async {
+            // Piped or redirected stdout is block-buffered by default, which
+            // would sit on every line until the buffer filled.
+            setbuf(stdout, nil)
+            let jar = HTTPCookieStorage.shared
+            // Spend the token, if the URL still carries one: the Host trades
+            // it for the signed cookie this session will reuse.
+            if url.query?.hasPrefix("token=") == true {
+                let configuration = URLSessionConfiguration.default
+                configuration.httpCookieStorage = jar
+                let session = URLSession(configuration: configuration)
+                _ = try? await session.data(for: URLRequest(url: url))
+            }
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            components?.query = nil
+            components?.fragment = nil
+            guard let origin = components?.url else {
+                print("watch-feed: unparseable URL")
+                return
+            }
+            print("watching \(origin) — Ctrl-C to stop")
+            let feed = HostFeed(
+                cookieProvider: { origin in jar.cookies(for: origin) ?? [] },
+                onEvent: { event in print("event: \(event)") },
+                onHealth: { health in print("health: \(health)") }
+            )
+            feed.start(origin: origin)
+            // The process is stopped with Ctrl-C; this sleep only keeps the
+            // async context alive while the feed works.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 3_600_000_000_000)
+            }
+        }
     }
 
     /// The menu bar is rendered by macOS from the bundle's effective

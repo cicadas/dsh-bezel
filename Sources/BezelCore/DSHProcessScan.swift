@@ -33,6 +33,17 @@ public enum DSHProcessScan {
         }
 
         public var id: pid_t { pid }
+
+        /// The port this process serves, as far as its command line can tell:
+        /// an explicit `--port`, else the web profile's default. `nil` for
+        /// `--port 0`, whose chosen port only the process's own output knows.
+        public var servingPort: Int? {
+            switch port {
+            case nil: return Report.defaultWebPort
+            case 0: return nil
+            case .some(let bound): return bound
+            }
+        }
     }
 
     /// What a scan found.
@@ -48,6 +59,12 @@ public enum DSHProcessScan {
         }
 
         public var isRunning: Bool { !matches.isEmpty }
+
+        /// The matches already serving `port`, as far as command lines can
+        /// tell — the fact behind "this port is taken by a running dsh".
+        public func matches(occupying port: Int) -> [Match] {
+            matches.filter { $0.servingPort == port }
+        }
 
         /// The best guess at where the found process is serving: the first
         /// explicit `--port` above zero, else the web profile's default.

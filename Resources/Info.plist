@@ -33,11 +33,13 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 DSH Bezel contributors</string>
 	<!-- The whole point of this app is loading a user-chosen dsh Host, which may
-	     be plain http on a LAN address. This key scopes the exception to WebView
-	     content only; the app's own network use stays under ATS. -->
+	     be plain http on a LAN address. The notification channel (HostFeed) makes
+	     the app's own requests to that same Host, so the exception can no longer
+	     be scoped to WebView content alone: the only addresses this app ever
+	     contacts are the ones the user configured. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
 </dict>

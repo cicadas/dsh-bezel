@@ -12,14 +12,56 @@ final class AppState {
     /// Posts page events as macOS notifications. A no-op outside an app
     /// bundle, so the bare `swift run` executable simply never notifies.
     private let notifier = Notifier()
-    /// Turns page snapshots into the transitions worth notifying about.
-    @ObservationIgnored private var pageEvents = PageEventDetector()
-    /// The hidden page reading the complete sidebar — every workspace
-    /// group, every session — for the background the displayed page cannot
-    /// see. Its rows replace the displayed page's (partial) ones before
-    /// detection. Ignored by Observation: it is machinery, not state a view
-    /// renders.
-    @ObservationIgnored private var sidebarProbe: SidebarProbe?
+    /// Turns Host feed facts into the transitions worth notifying about.
+    /// Ignored by Observation: it is machinery, not state a view renders.
+    @ObservationIgnored private var detector = SessionEventDetector()
+    /// The notification channel to the attached Host: the Host's own session
+    /// list and summons events, read over its API, so notifications never
+    /// have to watch — or touch — the Web page. Started and stopped with the
+    /// connection and the notification setting. Ignored by Observation: it is
+    /// machinery, not state a view renders.
+    @ObservationIgnored private var feed: HostFeed?
+    /// The origin the live feed is attached to, so reconnecting to the same
+    /// Host does not tear the channel down for nothing.
+    @ObservationIgnored private var feedOrigin: URL?
+    /// How the notification channel is doing, for the Settings status line.
+    private(set) var feedHealth: HostFeedHealth = .idle
+    /// Whether the Host is blocked waiting for the user's answer. Kept from
+    /// the feed's raw events (before the detector's dedupe, which folds
+    /// redeliveries away) because page renewal must never fire while an
+    /// approval or question is open.
+    @ObservationIgnored private var summonsActive = false
+
+    // MARK: Page renewal (interval housekeeping)
+
+    /// When the displayed page last finished loading cleanly.
+    @ObservationIgnored private var lastPageLoad: Date?
+    /// When this mechanism last renewed the page.
+    @ObservationIgnored private var lastRenewal: Date?
+    /// Periodic renewal check. Runs only while a Host is attached.
+    @ObservationIgnored private var renewalClock: Timer?
+    /// Fired whenever a window's visibility changes, so a renewal that has
+    /// been waiting for the user to hide the window happens within moments of
+    /// that, not at the next five-minute tick.
+    @ObservationIgnored private var occlusionObserver: (any NSObjectProtocol)?
+
+    /// A managed launch found the bookmark's own port already served by a
+    /// running dsh: the question the connect prompt must answer before
+    /// anything starts.
+    private(set) var portConflict: PortConflict?
+    /// True between pressing start on a managed Host and the port check's
+    /// answer. No launch has begun yet, so the status line names the check
+    /// rather than the runner's phases.
+    private(set) var isCheckingPort = false
+
+    /// One pending "this port is already served" question. The matches come
+    /// along so the judgment — which process, as `ps` saw it — is shown,
+    /// never a black box.
+    struct PortConflict: Equatable {
+        var hostID: UUID
+        var port: Int
+        var matches: [DSHProcessScan.Match]
+    }
 
     /// Language of this app's own interface, straight from the config file.
     ///
@@ -68,11 +110,23 @@ final class AppState {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.runner.stop() }
         }
+        // A renewal may only fire while no window is visible; a visibility
+        // change is therefore the moment the check is most worth running.
+        occlusionObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkPageRenewal() }
+        }
     }
 
     deinit {
         if let terminationObserver {
             NotificationCenter.default.removeObserver(terminationObserver)
+        }
+        if let occlusionObserver {
+            NotificationCenter.default.removeObserver(occlusionObserver)
         }
     }
 
@@ -105,13 +159,26 @@ final class AppState {
     }
 
     /// Toggle notifications. Turning them on asks the system for permission
-    /// (a granted one is remembered and never re-asked); either way the
-    /// detector starts from a fresh baseline, so transitions that happened
+    /// (a granted one is remembered and never re-asked) and brings the Host
+    /// channel up; turning them off tears it down, so a bezel that is not
+    /// notifying holds no connection at all. Either way the detector starts
+    /// from a fresh baseline on the next start, so transitions that happened
     /// while notifications were off can never fire late.
     func setNotificationsEnabled(_ enabled: Bool) {
         config.setNotificationsEnabled(enabled)
-        pageEvents.reset()
-        if enabled { notifier.requestAuthorizationIfNeeded() }
+        if enabled {
+            notifier.requestAuthorizationIfNeeded()
+            updateFeed()
+        } else {
+            stopFeed()
+        }
+    }
+
+    /// Toggle automatic page renewal. Nothing else needs to change here: the
+    /// clock runs whenever a Host is attached, and every decision consults
+    /// the setting, so flipping it takes effect at the next check.
+    func setPageRenewalEnabled(_ enabled: Bool) {
+        config.setPageRenewalEnabled(enabled)
     }
 
     // MARK: - Connection
@@ -201,19 +268,107 @@ final class AppState {
         // next launch reconnects to.
         config.noteConnected(id: host.id)
         if host.managed {
+            startManaged(host: host)
+        } else {
+            currentURL = host.loadURL
+            startRenewalClock()
+            updateFeed()
+        }
+    }
+
+    /// Begin a managed launch by asking the process table first: is the
+    /// bookmark's own port already served by a running dsh? Starting a second
+    /// dsh where one already answers would be the wrong answer to "start
+    /// dsh" — the one that is there is the one to attach to.
+    ///
+    /// The scan reads the whole process table, so it runs off the main actor;
+    /// nothing has been launched yet, and `finishManagedLaunch` decides
+    /// between the launch and the question once the answer is in.
+    private func startManaged(host: DSHHost) {
+        guard let port = host.origin?.port else {
+            // Nothing meaningful to check (an origin without an explicit
+            // port): launch as before.
             runner.start(host: host) { [weak self] url in
                 guard let self, self.attachedHostID == host.id, self.runner.hostID == host.id else { return }
                 self.currentURL = url
+                self.startRenewalClock()
+                self.updateFeed()
+            }
+            return
+        }
+        isCheckingPort = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let report = DSHProcessScan.scan()
+            let occupied = report.matches(occupying: port)
+            await MainActor.run { [weak self] in
+                self?.finishManagedLaunch(hostID: host.id, port: port, occupied: occupied)
+            }
+        }
+    }
+
+    /// The check's answer, back on the main actor. Only the Host this check
+    /// was started for may act: anything else means the user moved on while
+    /// `ps` was running, and a stale answer is dropped whole.
+    private func finishManagedLaunch(hostID: UUID, port: Int, occupied: [DSHProcessScan.Match]) {
+        isCheckingPort = false
+        guard attachedHostID == hostID, currentURL == nil, let host = config.host(id: hostID) else { return }
+        if occupied.isEmpty {
+            runner.start(host: host) { [weak self] url in
+                guard let self, self.attachedHostID == hostID, self.runner.hostID == hostID else { return }
+                self.currentURL = url
+                self.startRenewalClock()
+                self.updateFeed()
             }
         } else {
-            currentURL = host.loadURL
+            portConflict = PortConflict(hostID: hostID, port: port, matches: occupied)
         }
+    }
+
+    /// The conflict's preferred answer: attach to the dsh that is already
+    /// serving the port, launching nothing. The bookmark stays managed — the
+    /// next launch that finds the port free starts a child as usual.
+    func bindToRunningDSH() {
+        guard let conflict = portConflict, let host = config.host(id: conflict.hostID),
+              let url = host.origin
+        else {
+            portConflict = nil
+            return
+        }
+        portConflict = nil
+        config.select(id: host.id)
+        attachedHostID = host.id
+        web = WebViewState(isLoading: true)
+        config.noteConnected(id: host.id)
+        // `origin`, not `loadURL`: binding rides the cookie the Host already
+        // minted, so the one-shot token is never re-spent.
+        currentURL = url
+        startRenewalClock()
+        updateFeed()
+    }
+
+    /// Decline both answers: stay on the connect prompt, start nothing.
+    func dismissPortConflict() {
+        portConflict = nil
     }
 
     /// Attach to the Host currently selected in the picker.
     func connectSelected() {
         guard let host = config.selectedHost else { return }
         connect(to: host)
+    }
+
+    /// What the connect prompt's primary button says for the Host the picker
+    /// selects. "Connect" names two different acts here — attaching to a Host
+    /// someone else runs, or launching one this app runs — and for the
+    /// second, whether the launch is fresh or replaces a child that is
+    /// already alive.
+    var connectButtonMessage: Message {
+        guard let host = config.selectedHost else { return .buttonConnectSelected }
+        switch runner.connectAction(for: host) {
+        case .connect: return .buttonConnectSelected
+        case .startManaged: return .buttonStartDSH
+        case .restartManaged: return .buttonRestartDSH
+        }
     }
 
     /// Drop the page and terminate any owned child process.
@@ -223,114 +378,181 @@ final class AppState {
         attachedHostID = nil
         web = WebViewState()
         // A different page (or none) means everything the detector remembers
-        // is about a conversation nobody is looking at — and the probe was
+        // is about a conversation nobody is looking at — and the channel was
         // authorized for a Host this app is no longer attached to.
-        pageEvents.reset()
-        stopSidebarProbe()
+        stopFeed()
+        stopRenewalClock()
+        lastPageLoad = nil
+        lastRenewal = nil
+        summonsActive = false
+        portConflict = nil
+        isCheckingPort = false
     }
 
     func reload() {
         reloadToken &+= 1
-        // A reload re-runs the observer script, whose first post is a fresh
-        // baseline; the detector must not draw conclusions across the gap.
-        pageEvents.reset()
+        // Nothing to reset here: the notification channel reads the Host's
+        // API, not the page, so a page reload is not a gap in its facts.
     }
 
     func apply(_ state: WebViewState) {
         web = state
+        // A clean load — initial navigation or a renewal's reload — restarts
+        // the renewal clock: the page's age is its age since it last loaded.
+        if !state.isLoading, state.problem == nil, currentURL != nil {
+            lastPageLoad = Date()
+        }
     }
 
-    // MARK: - Page signals
+    // MARK: - Notification channel
 
-    /// Feed the observer script's latest snapshot to the detector, and notify
-    /// the user about anything that needs them.
-    func apply(_ snapshot: PageSnapshot) {
-        guard config.notificationsEnabled else {
-            pageEvents.reset()
-            stopSidebarProbe()
+    /// Bring the Host notification channel in line with what is attached and
+    /// what the settings ask for. Idempotent: a channel already on the right
+    /// origin stays put, so SwiftUI's re-renders cannot churn the socket.
+    private func updateFeed() {
+        guard config.notificationsEnabled, let url = currentURL, let origin = Self.origin(of: url) else {
+            stopFeed()
             return
         }
-        // The first snapshot means the displayed page is up and authorized,
-        // so its cookie exists to copy: the right moment to bring the probe
-        // up. From here on every poll also nudges the probe's watchdog.
-        if sidebarProbe == nil, let url = currentURL {
-            let probe = SidebarProbe()
-            probe.start(url: url)
-            sidebarProbe = probe
-        }
-        sidebarProbe?.reloadIfStale()
-        // The probe's sidebar is complete (every group expanded); the
-        // displayed page's is whatever its view state renders. While the
-        // probe is alive and posting, its rows are the background's truth.
-        var merged = snapshot
-        if let rows = sidebarProbe?.freshSidebar {
-            merged = merged.replacingSidebar(rows)
-        }
-        for event in pageEvents.advance(to: merged) {
-            notify(event, sessionTitle: merged.currentSessionTitle)
-        }
+        guard feed == nil || feedOrigin != origin else { return }
+        stopFeed()
+        feedOrigin = origin
+        // A fresh channel knows nothing; the first list snapshot is its
+        // baseline, and everything before it is state, not news.
+        detector.reset()
+        let channel = HostFeed(
+            cookieProvider: WebKitCredentials.reader(),
+            onEvent: { [weak self] in self?.handle($0) },
+            onHealth: { [weak self] in self?.feedHealth = $0 }
+        )
+        channel.start(origin: origin)
+        feed = channel
     }
 
-    /// Tear the probe down; the displayed page's own sidebar is the fallback.
-    private func stopSidebarProbe() {
-        sidebarProbe?.stop()
-        sidebarProbe = nil
+    /// Tear the channel down and forget its baseline.
+    private func stopFeed() {
+        feed?.stop()
+        feed = nil
+        feedOrigin = nil
+        detector.reset()
+        feedHealth = .idle
+        // The knowledge of an open summons dies with the channel: a stale
+        // "waiting" would block page renewal forever, and the worst case of
+        // the opposite — one renewal while the SPA happens to show a panel —
+        // is recoverable, since the Host still holds the pending request.
+        summonsActive = false
     }
 
-    /// The page event as a notification. The message follows the interface
-    /// language; the subtitle always names the conversation the event is
-    /// about, so no banner is a bare "something happened". The body carries
-    /// the one line of content the page can offer: the user's own words for
-    /// a finished task.
-    private func notify(_ event: PageEvent, sessionTitle: String?) {
-        let message: Message
-        let subtitle: String?
-        let body: String?
+    /// The authority a page URL points at, without its one-time token: the
+    /// notification channel authorizes with the cookie the page minted, so
+    /// the token is not part of the channel's identity.
+    private static func origin(of url: URL) -> URL? {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.query = nil
+        components?.fragment = nil
+        return components?.url
+    }
+
+    /// Feed facts in, notifications out. The raw summons frames are also the
+    /// renewal mechanism's "the Host is blocked on an answer" signal.
+    private func handle(_ event: HostFeedEvent) {
         switch event {
-        case .attentionNeeded(.approval):
-            message = .notificationAttentionApproval
-            subtitle = sessionTitle ?? hostName
-            body = nil
-        case .attentionNeeded(.question):
-            message = .notificationAttentionQuestion
-            subtitle = sessionTitle ?? hostName
-            body = nil
-        case .attentionNeeded(.planReview):
-            message = .notificationAttentionPlan
-            subtitle = sessionTitle ?? hostName
-            body = nil
-        case .attentionNeeded(.none):
-            return
-        case .taskFinished(let prompt):
-            message = .notificationTaskFinished
-            subtitle = sessionTitle
-            body = prompt.map(taskLabel)
-        case .backgroundTaskFinished(let title):
-            message = .notificationBackgroundTaskFinished
-            subtitle = title
-            body = nil
-        case .backgroundAttentionNeeded(let title):
-            message = .notificationBackgroundAttention
-            subtitle = title
-            body = nil
+        case .summons: summonsActive = true
+        case .summonsEnded: summonsActive = false
+        case .sessions, .runningChanged, .failed: break
         }
-        // A summons must reach the user in any app state — frontmost,
-        // background, minimized — because it blocks the Host; a finish is
-        // status, and may yield to "the page is already showing it".
-        notifier.deliver(title: text(message), subtitle: subtitle, body: body, essential: event.isWaitingForUser)
+        for notification in detector.advance(event) {
+            notify(notification)
+        }
     }
 
-    /// Which connection a page event is about, when the page itself could
-    /// not name the conversation.
+    /// The notification as macOS delivers it. The message follows the
+    /// interface language; the subtitle names the conversation the event is
+    /// about — the Host's own title for the session — so no banner is a bare
+    /// "something happened".
+    private func notify(_ event: NotificationEvent) {
+        switch event {
+        case .waitingForUser(let kind, let session):
+            let message: Message
+            switch kind {
+            case .approval: message = .notificationAttentionApproval
+            case .question: message = .notificationAttentionQuestion
+            case .planReview: message = .notificationAttentionPlan
+            }
+            // A summons must reach the user in any app state — frontmost,
+            // background, minimized — because it blocks the Host until it is
+            // answered.
+            notifier.deliver(title: text(message), subtitle: session ?? hostName, body: nil, essential: true)
+        case .turnFinished(let session):
+            // A finish is status, not a summons: while this app is frontmost
+            // with its window up, the page is its own notification.
+            notifier.deliver(title: text(.notificationTaskFinished), subtitle: session ?? hostName, body: nil, essential: false)
+        }
+    }
+
+    /// Which connection a notification is about, when the session list could
+    /// not name the conversation (a session that has never been prompted has
+    /// no title yet).
     private var hostName: String? {
         attachedHost?.displayName(in: localization)
     }
 
-    /// One line of task identity: whitespace collapsed, bounded to what a
-    /// notification banner will actually show.
-    private func taskLabel(_ prompt: String) -> String {
-        let collapsed = prompt.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return collapsed.count > 80 ? String(collapsed.prefix(80)) + "…" : collapsed
+    // MARK: - Page renewal
+
+    /// Whether the renewal mechanism may act at all: it is a setting, and it
+    /// needs a page to renew.
+    private var renewalArmed: Bool {
+        config.pageRenewalEnabled && currentURL != nil
+    }
+
+    /// The five-minute heartbeat, plus opportunistic checks whenever a window
+    /// changes visibility. Both funnel into `checkPageRenewal`, which is cheap
+    /// to refuse and idempotent.
+    private func startRenewalClock() {
+        guard renewalClock == nil else { return }
+        let timer = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkPageRenewal() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        renewalClock = timer
+    }
+
+    private func stopRenewalClock() {
+        renewalClock?.invalidate()
+        renewalClock = nil
+    }
+
+    /// Gather the facts one renewal decision needs and act on the answer.
+    /// Everything the decision reads is main-actor state; the check is cheap
+    /// to refuse and idempotent, so the clock and the occlusion observer both
+    /// call it as often as they like.
+    private func checkPageRenewal() {
+        guard renewalArmed else { return }
+        let facts = PageRenewal.Facts(
+            now: Date(),
+            lastLoad: lastPageLoad,
+            windowVisible: NSApp.windows.contains { $0.occlusionState.contains(.visible) },
+            summonsActive: summonsActive,
+            lastRenewal: lastRenewal
+        )
+        guard PageRenewal.isDue(facts) else { return }
+        // Whatever happens after this, the page is about to be brand new:
+        // the cooldown and the load clock both restart now, so a renewal can
+        // never re-arm itself into a loop.
+        lastRenewal = Date()
+        lastPageLoad = Date()
+        reloadToken &+= 1
+    }
+
+    /// The notification channel's state, worded for Settings. `nil` while
+    /// nothing is attached: only states worth a line are worded.
+    var channelStatus: String? {
+        switch feedHealth {
+        case .idle, .connecting: nil
+        case .healthy: text(.settingsChannelHealthy)
+        case .unauthorized: text(.settingsChannelUnauthorized)
+        case .reconnecting: text(.settingsChannelReconnecting)
+        }
     }
 
     func openInBrowser() {
@@ -368,6 +590,9 @@ final class AppState {
     /// One line describing the connection for the toolbar and the connect prompt.
     var statusText: String {
         if let problemText { return problemText }
+        // The port check runs before any launch, so the runner has nothing
+        // to say yet; the check itself is what is happening.
+        if isCheckingPort { return text(.phaseCheckingPort) }
         if attachedHost?.managed == true {
             switch runner.phase {
             case .locating: return text(.phaseLocating)

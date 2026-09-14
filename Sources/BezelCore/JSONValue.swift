@@ -102,3 +102,32 @@ struct JSONCodingKey: CodingKey {
         self.stringValue = String(intValue)
     }
 }
+
+/// Typed reads for the tolerant tree. Accessors, not access control: a value
+/// of the wrong kind simply reads as `nil`, which lets callers say "a string,
+/// or nothing" without a `switch`.
+public extension JSONValue {
+    /// The string this value holds, if it is a string.
+    var string: String? {
+        if case .string(let value) = self { return value }
+        return nil
+    }
+
+    /// The boolean this value holds, if it is a boolean.
+    var bool: Bool? {
+        if case .bool(let value) = self { return value }
+        return nil
+    }
+
+    /// The array this value holds, if it is an array.
+    var array: [JSONValue]? {
+        if case .array(let value) = self { return value }
+        return nil
+    }
+
+    /// The object this value holds, if it is an object.
+    var object: [String: JSONValue]? {
+        if case .object(let value) = self { return value }
+        return nil
+    }
+}

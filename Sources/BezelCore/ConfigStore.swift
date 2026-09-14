@@ -103,6 +103,8 @@ public final class ConfigStore {
     public var lastConnectedHostID: UUID? { config.lastConnectedHostID }
     public var language: AppLanguage { config.language }
     public var notificationsEnabled: Bool { config.notificationsEnabled }
+    /// Whether the app may renew the displayed page on its own.
+    public var pageRenewalEnabled: Bool { config.pageRenewalEnabled }
     /// Whether the first-launch guide is still due — a fresh install, or one
     /// whose guide was never finished.
     public var onboardingCompleted: Bool { config.onboardingCompleted }
@@ -141,6 +143,12 @@ public final class ConfigStore {
     public func setNotificationsEnabled(_ enabled: Bool) {
         guard config.notificationsEnabled != enabled else { return }
         config.notificationsEnabled = enabled
+        persist()
+    }
+
+    public func setPageRenewalEnabled(_ enabled: Bool) {
+        guard config.pageRenewalEnabled != enabled else { return }
+        config.pageRenewalEnabled = enabled
         persist()
     }
 

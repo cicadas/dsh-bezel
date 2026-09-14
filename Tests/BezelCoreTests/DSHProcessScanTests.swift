@@ -119,6 +119,26 @@ final class DSHProcessScanTests: XCTestCase {
         XCTAssertEqual(random.suggestedPort, nil)
     }
 
+    // MARK: - Occupied ports
+
+    /// The fact behind "this port is taken": a dsh whose explicit port — or
+    /// whose silent default — is the one in question. `--port 0` stays out:
+    /// only its own startup output knows where it landed.
+    func testFindsTheMatchesOccupyingAPort() {
+        let report = DSHProcessScan.Report(matches: parse([
+            "  502 node /Users/me/.npm/_npx/1e7f6d9597241db0/node_modules/.bin/dsh web",
+            "  503 /opt/homebrew/bin/dsh --profile web --port 0 --no-open",
+            "  504 /opt/homebrew/bin/dsh web --port 3080",
+            "  505 /opt/homebrew/bin/dsh web --port 3000",
+        ].joined(separator: "\n")))
+
+        // The first serves the web profile's default; the third pinned the
+        // port itself; the second chose nothing knowable from the outside.
+        XCTAssertEqual(report.matches(occupying: 3080).map(\.pid), [502, 504])
+        XCTAssertEqual(report.matches(occupying: 3000).map(\.pid), [505])
+        XCTAssertTrue(report.matches(occupying: 3128).isEmpty)
+    }
+
     // MARK: - Line parsing
 
     func testIgnoresLinesWithoutACommand() {

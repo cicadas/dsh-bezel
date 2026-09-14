@@ -233,6 +233,16 @@ struct GeneralSettings: View {
             Text(app.text(.settingsNotificationsHelp))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if app.config.notificationsEnabled, let channel = app.channelStatus {
+                Text(channel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(app.text(.settingsPageRefresh), isOn: pageRenewalBinding)
+            Text(app.text(.settingsPageRefreshHelp))
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             LabeledContent(app.text(.settingsConfigFile)) {
                 Text(app.config.url.path)
@@ -261,6 +271,13 @@ struct GeneralSettings: View {
         Binding(
             get: { app.config.notificationsEnabled },
             set: { app.setNotificationsEnabled($0) }
+        )
+    }
+
+    private var pageRenewalBinding: Binding<Bool> {
+        Binding(
+            get: { app.config.pageRenewalEnabled },
+            set: { app.setPageRenewalEnabled($0) }
         )
     }
 }

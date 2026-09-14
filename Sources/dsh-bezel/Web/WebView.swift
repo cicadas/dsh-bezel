@@ -26,19 +26,20 @@ struct WebViewState: Equatable {
 }
 
 /// Hosts one dsh Host's own Web UI inside a `WKWebView`.
+///
+/// Purely a display: nothing is injected into the page, nothing is read back
+/// from it, and its view state is the page's own business. Notifications are
+/// served by the Host API channel (`HostFeed`), which never touches this
+/// view.
 struct WebView: NSViewRepresentable {
     /// URL to display; `nil` shows nothing.
     let url: URL?
     /// Bump to reload the page currently displayed.
     let reloadToken: Int
-    /// Delivered on the main queue with each page-signal snapshot the
-    /// observer script posts. See `PageSnapshot` for what is watched and why
-    /// watching is all this app does.
-    let onSignals: (PageSnapshot) -> Void
     /// Delivered on the main queue after each navigation change.
     let onState: (WebViewState) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSignals: onSignals, onState: onState) }
+    func makeCoordinator() -> Coordinator { Coordinator(onState: onState) }
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -46,22 +47,6 @@ struct WebView: NSViewRepresentable {
         // it, so the persistent store is required; an ephemeral store would
         // drop the 30-day credential on quit.
         configuration.websiteDataStore = .default()
-        // The page-signal observer rides along on every page this WebView
-        // loads. It reads the markers the Host's own UI renders and posts
-        // snapshots; it never modifies the page.
-        configuration.userContentController.addUserScript(
-            WKUserScript(
-                source: PageSnapshot.observerScript,
-                injectionTime: .atDocumentEnd,
-                forMainFrameOnly: true,
-                in: .page
-            )
-        )
-        configuration.userContentController.add(
-            context.coordinator,
-            contentWorld: .page,
-            name: PageSnapshot.scriptHandlerName
-        )
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         // Without a uiDelegate WebKit silently drops every new-window request,
@@ -75,14 +60,12 @@ struct WebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        context.coordinator.onSignals = onSignals
         context.coordinator.onState = onState
         context.coordinator.apply(url: url, reloadToken: reloadToken)
     }
 
     /// Drives one WebView and forwards its navigation state to SwiftUI.
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
-        var onSignals: (PageSnapshot) -> Void
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var onState: (WebViewState) -> Void
         private weak var webView: WKWebView?
         private var loadedURL: URL?
@@ -96,8 +79,7 @@ struct WebView: NSViewRepresentable {
         /// unconditionally there wiped the banner before any publish could show it.
         private var authRejected = false
 
-        init(onSignals: @escaping (PageSnapshot) -> Void, onState: @escaping (WebViewState) -> Void) {
-            self.onSignals = onSignals
+        init(onState: @escaping (WebViewState) -> Void) {
             self.onState = onState
         }
 
@@ -131,20 +113,6 @@ struct WebView: NSViewRepresentable {
             // Navigation callbacks can arrive inside a SwiftUI update; defer so
             // reporting never mutates observed state mid-render.
             DispatchQueue.main.async { [weak self] in self?.onState(snapshot) }
-        }
-
-        // MARK: - Page signals
-
-        func userContentController(
-            _ userContentController: WKUserContentController,
-            didReceive message: WKScriptMessage
-        ) {
-            guard let body = message.body as? [String: Any],
-                  let snapshot = PageSnapshot.fromScriptMessage(body)
-            else { return }
-            // Same defer as publish(): observer callbacks may land inside a
-            // SwiftUI update.
-            DispatchQueue.main.async { [weak self] in self?.onSignals(snapshot) }
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

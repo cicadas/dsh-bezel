@@ -22,6 +22,10 @@ public struct AppConfig: Equatable, Sendable {
     public var lastConnectedHostID: UUID?
     /// Whether page events may become macOS notifications.
     public var notificationsEnabled: Bool
+    /// Whether the app may renew the displayed page on its own — a reload
+    /// after a day of age, or when the content process grows past the memory
+    /// limit — to keep a long-lived display from piling up renderer memory.
+    public var pageRenewalEnabled: Bool
     /// Whether the first-launch guide has been finished (or skipped).
     ///
     /// The default is `true` and the *decoder's* default for a file that
@@ -49,6 +53,7 @@ public struct AppConfig: Equatable, Sendable {
         selectedHostID: UUID? = nil,
         lastConnectedHostID: UUID? = nil,
         notificationsEnabled: Bool = true,
+        pageRenewalEnabled: Bool = true,
         onboardingCompleted: Bool = true,
         unknownFields: [String: JSONValue] = [:]
     ) {
@@ -58,6 +63,7 @@ public struct AppConfig: Equatable, Sendable {
         self.selectedHostID = selectedHostID
         self.lastConnectedHostID = lastConnectedHostID
         self.notificationsEnabled = notificationsEnabled
+        self.pageRenewalEnabled = pageRenewalEnabled
         self.onboardingCompleted = onboardingCompleted
         self.unknownFields = unknownFields
     }
@@ -72,7 +78,7 @@ public struct AppConfig: Equatable, Sendable {
 
 extension AppConfig: Codable {
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case version, language, hosts, selectedHostID, lastConnectedHostID, notificationsEnabled, onboardingCompleted
+        case version, language, hosts, selectedHostID, lastConnectedHostID, notificationsEnabled, pageRenewalEnabled, onboardingCompleted
     }
 
     /// Decoded field by field, like `DSHHost`.
@@ -90,6 +96,7 @@ extension AppConfig: Codable {
         selectedHostID = try? container.decode(UUID.self, forKey: .selectedHostID)
         lastConnectedHostID = try? container.decode(UUID.self, forKey: .lastConnectedHostID)
         notificationsEnabled = (try? container.decode(Bool.self, forKey: .notificationsEnabled)) ?? true
+        pageRenewalEnabled = (try? container.decode(Bool.self, forKey: .pageRenewalEnabled)) ?? true
         // Absent means the file predates the guide, and such a user has
         // already set the app up — see the property's documentation.
         onboardingCompleted = (try? container.decode(Bool.self, forKey: .onboardingCompleted)) ?? true
@@ -124,6 +131,7 @@ extension AppConfig: Codable {
         try container.encodeIfPresent(selectedHostID, forKey: .selectedHostID)
         try container.encodeIfPresent(lastConnectedHostID, forKey: .lastConnectedHostID)
         try container.encode(notificationsEnabled, forKey: .notificationsEnabled)
+        try container.encode(pageRenewalEnabled, forKey: .pageRenewalEnabled)
         try container.encode(onboardingCompleted, forKey: .onboardingCompleted)
     }
 }

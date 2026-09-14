@@ -24,6 +24,70 @@ final class LocalHostRunnerTests: XCTestCase {
         XCTAssertNil(LocalHostRunner.announcedURL(in: "dsh web: (no url yet)"))
     }
 
+    // MARK: - Connect action
+
+    /// An external Host is only ever attached to, whatever this runner is up to.
+    func testAnExternalHostIsOnlyEverConnectedTo() {
+        let host = DSHHost(baseURL: "http://127.0.0.1:3080", managed: false)
+        XCTAssertEqual(
+            LocalHostRunner.connectAction(
+                for: host,
+                runnerHostID: host.id,
+                phase: .running(URL(string: "http://127.0.0.1:53080")!)
+            ),
+            .connect
+        )
+    }
+
+    /// A restart is offered exactly while a child *of this Host* is alive; a
+    /// child belonging to another Host does not turn a start into a restart.
+    func testARestartIsOfferedOnlyWhileThisHostsChildIsAlive() {
+        let host = DSHHost(baseURL: "http://127.0.0.1:3080", managed: true)
+        let other = DSHHost(baseURL: "http://127.0.0.1:3081", managed: true)
+        let url = URL(string: "http://127.0.0.1:53080")!
+        XCTAssertEqual(LocalHostRunner.connectAction(for: host, runnerHostID: nil, phase: .starting), .startManaged)
+        XCTAssertEqual(LocalHostRunner.connectAction(for: host, runnerHostID: other.id, phase: .running(url)), .startManaged)
+        XCTAssertEqual(LocalHostRunner.connectAction(for: host, runnerHostID: host.id, phase: .starting), .restartManaged)
+        XCTAssertEqual(LocalHostRunner.connectAction(for: host, runnerHostID: host.id, phase: .running(url)), .restartManaged)
+    }
+
+    /// Nothing alive to replace is a fresh launch: from idle, during the
+    /// executable search (no child yet), and after a failure alike.
+    func testAFreshStartIsOfferedWhenNoChildIsAlive() {
+        let host = DSHHost(baseURL: "http://127.0.0.1:3080", managed: true)
+        XCTAssertEqual(LocalHostRunner.connectAction(for: host, runnerHostID: host.id, phase: .idle), .startManaged)
+        XCTAssertEqual(LocalHostRunner.connectAction(for: host, runnerHostID: host.id, phase: .locating), .startManaged)
+        XCTAssertEqual(
+            LocalHostRunner.connectAction(for: host, runnerHostID: host.id, phase: .failed(.timedOut(seconds: 30))),
+            .startManaged
+        )
+    }
+
+    /// The instance view of the same fact, across one child's whole life:
+    /// start before it exists, restart while it is alive, start again once
+    /// `stop()` has taken it down.
+    @MainActor
+    func testConnectActionFollowsTheChildsLife() async throws {
+        let fake = try makeFakeDSH()
+        defer { try? FileManager.default.removeItem(at: fake.url.deletingLastPathComponent()) }
+
+        let host = DSHHost(baseURL: "http://127.0.0.1:3080", managed: true, launchCommand: fake.url.path)
+        let runner = LocalHostRunner()
+        defer { runner.stop() }
+        XCTAssertEqual(runner.connectAction(for: host), .startManaged)
+
+        runner.start(host: host) { _ in }
+        let announced = await waitFor(30) {
+            if case .running = runner.phase { return true }
+            return nil
+        }
+        XCTAssertEqual(announced, true, "expected the fake dsh to announce its URL")
+        XCTAssertEqual(runner.connectAction(for: host), .restartManaged)
+
+        runner.stop()
+        XCTAssertEqual(runner.connectAction(for: host), .startManaged)
+    }
+
     // MARK: - Live launches
 
     /// A stand-in for `dsh`: prints the startup line, records its pid, then

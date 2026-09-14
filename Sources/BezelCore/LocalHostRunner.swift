@@ -33,6 +33,17 @@ public final class LocalHostRunner {
         case timedOut(seconds: Int)
     }
 
+    /// What the connect prompt's primary button does for a Host.
+    ///
+    /// A Host nobody manages is only ever attached to; a managed one is
+    /// *launched*, and the button says which launch is coming — a fresh one,
+    /// or the replacement of a child that is already alive.
+    public enum ConnectAction: Equatable, Sendable {
+        case connect
+        case startManaged
+        case restartManaged
+    }
+
     /// How long `dsh` gets to print its startup line. It normally takes a
     /// second or two; without a deadline the app would sit on "Starting local
     /// dsh…" for ever whenever the child hangs.
@@ -107,6 +118,35 @@ public final class LocalHostRunner {
         let profile = host.profile.trimmingCharacters(in: .whitespacesAndNewlines)
         return ["--profile", profile.isEmpty ? "web" : profile, "--port", "0", "--no-open"]
             + host.argumentList
+    }
+
+    /// What pressing the prompt's primary button would do to `host` right now.
+    public func connectAction(for host: DSHHost) -> ConnectAction {
+        Self.connectAction(for: host, runnerHostID: hostID, phase: phase)
+    }
+
+    /// The pure core of `connectAction(for:)`: the button offers a restart
+    /// only while a child *of this Host* is alive, and the distinction is
+    /// testable without spawning anything.
+    ///
+    /// A search in flight owns no child yet, so it reads as a start too —
+    /// pressing the button then supersedes the search, which `start` already
+    /// handles by stopping whatever it holds.
+    public nonisolated static func connectAction(
+        for host: DSHHost,
+        runnerHostID: UUID?,
+        phase: Phase
+    ) -> ConnectAction {
+        guard host.managed else { return .connect }
+        switch phase {
+        // A child of this Host is alive: the launch terminates and replaces it.
+        case .starting, .running:
+            return runnerHostID == host.id ? .restartManaged : .startManaged
+        // Nothing alive to replace — a fresh launch, after a failure same as
+        // from idle.
+        case .idle, .locating, .failed:
+            return .startManaged
+        }
     }
 
     public init() {}

@@ -51,6 +51,7 @@ public enum Message: CaseIterable, Sendable {
     case statusConnected
     case phaseLocating
     case phaseStarting
+    case phaseCheckingPort
 
     // Managed-host failures
     case failureNoDSH
@@ -80,8 +81,14 @@ public enum Message: CaseIterable, Sendable {
     case toolbarDisconnect
     case menuManageHosts
     case buttonConnectSelected
+    case buttonStartDSH
+    case buttonRestartDSH
     case buttonCheckHostSettings
     case connectPromptTitle
+    case portConflictTitle
+    case portConflictMessage
+    case portConflictBind
+    case portConflictCancel
 
     // Settings
     case settingsTabHosts
@@ -119,10 +126,13 @@ public enum Message: CaseIterable, Sendable {
     case notificationAttentionQuestion
     case notificationAttentionPlan
     case notificationTaskFinished
-    case notificationBackgroundTaskFinished
-    case notificationBackgroundAttention
     case settingsNotifications
     case settingsNotificationsHelp
+    case settingsChannelHealthy
+    case settingsChannelUnauthorized
+    case settingsChannelReconnecting
+    case settingsPageRefresh
+    case settingsPageRefreshHelp
 
     // First-launch guide
     case onboardingTitle
@@ -225,6 +235,7 @@ extension Message {
         case .statusConnected: "Connected"
         case .phaseLocating: "Looking for a usable dsh…"
         case .phaseStarting: "Starting local dsh…"
+        case .phaseCheckingPort: "Checking whether a dsh already serves this port…"
 
         case .failureNoDSH: "No usable dsh found (tried {1} locations; see the output below)"
         case .failureLaunchFailed: "Could not launch dsh: {1}"
@@ -251,8 +262,14 @@ extension Message {
         case .toolbarDisconnect: "Disconnect"
         case .menuManageHosts: "Manage Hosts…"
         case .buttonConnectSelected: "Connect Selected Host"
+        case .buttonStartDSH: "Start dsh"
+        case .buttonRestartDSH: "Restart dsh"
         case .buttonCheckHostSettings: "Check Host Settings"
         case .connectPromptTitle: "Select a dsh Host to connect to"
+        case .portConflictTitle: "Port Already Served by a Running dsh"
+        case .portConflictMessage: "A dsh is already running on port {1} ({2}). You can bind to it instead; this app will not start another one."
+        case .portConflictBind: "Bind to the Running dsh"
+        case .portConflictCancel: "Cancel"
 
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "General"
@@ -287,10 +304,13 @@ extension Message {
         case .notificationAttentionQuestion: "The Host asked a question and is waiting for your answer"
         case .notificationAttentionPlan: "A plan is waiting for your review"
         case .notificationTaskFinished: "The task has finished"
-        case .notificationBackgroundTaskFinished: "A background task has finished"
-        case .notificationBackgroundAttention: "A background session is waiting for you"
         case .settingsNotifications: "Notifications"
-        case .settingsNotificationsHelp: "A macOS notification when the Host is waiting for you — a tool approval, a question, a plan review, in this page or a background session — and when a running task finishes. Whatever state this app is in, a waiting Host always notifies; a finished task notifies only while this app is not frontmost. Clicking one brings the window forward."
+        case .settingsNotificationsHelp: "A macOS notification when the Host is waiting for you — a tool approval, a question, a plan review, in any session — and when a running task finishes. Whatever state this app is in, a waiting Host always notifies; a finished task notifies only while this app is not frontmost. Clicking one brings the window forward."
+        case .settingsChannelHealthy: "Notification channel: connected to the Host API"
+        case .settingsChannelUnauthorized: "Notification channel: waiting for the Host's credential — open the page once and it recovers on its own"
+        case .settingsChannelReconnecting: "Notification channel: reconnecting…"
+        case .settingsPageRefresh: "Auto-refresh page"
+        case .settingsPageRefreshHelp: "Recarga la página por su cuenta cuando lleva un día abierta, para que una pantalla de larga duración no acumule memoria de renderizado. Ocurre solo cuando ninguna ventana está visible, y nunca mientras el Host espera tu respuesta."
 
         case .onboardingTitle: "Welcome to DSH Bezel"
         case .onboardingSubtitle: "Let's connect to your first dsh Host."
@@ -351,6 +371,7 @@ extension Message {
         case .statusConnected: "已连接"
         case .phaseLocating: "正在查找可用的 dsh…"
         case .phaseStarting: "正在启动本地 dsh…"
+        case .phaseCheckingPort: "正在检查端口是否已有 dsh 在运行…"
 
         case .failureNoDSH: "找不到可用的 dsh（已尝试 {1} 个位置，详见下方输出）"
         case .failureLaunchFailed: "无法启动 dsh：{1}"
@@ -377,8 +398,14 @@ extension Message {
         case .toolbarDisconnect: "断开"
         case .menuManageHosts: "管理 Host…"
         case .buttonConnectSelected: "连接选中的 Host"
+        case .buttonStartDSH: "启动 dsh"
+        case .buttonRestartDSH: "重启 dsh"
         case .buttonCheckHostSettings: "检查 Host 设置"
         case .connectPromptTitle: "选择要连接的 dsh Host"
+        case .portConflictTitle: "端口已被运行中的 dsh 占用"
+        case .portConflictMessage: "端口 {1} 上已有一个 dsh 在运行（{2}）。可以直接绑定到它，本应用不会再启动一个新的。"
+        case .portConflictBind: "绑定到运行中的 dsh"
+        case .portConflictCancel: "取消"
 
         case .settingsTabHosts: "Host"
         case .settingsTabGeneral: "通用"
@@ -413,10 +440,13 @@ extension Message {
         case .notificationAttentionQuestion: "Host 提了一个问题，在等你的回答"
         case .notificationAttentionPlan: "有计划在等你审阅"
         case .notificationTaskFinished: "任务已结束"
-        case .notificationBackgroundTaskFinished: "后台有任务已结束"
-        case .notificationBackgroundAttention: "有后台会话在等你"
         case .settingsNotifications: "通知"
-        case .settingsNotificationsHelp: "Host 等你处理时（工具审批、提问、计划审阅——无论在当前页面还是后台会话），以及正在运行的任务结束时，发一条 macOS 通知。无论本应用处于什么状态，等待类通知都会发送；任务结束仅在本应用不在前台时发送。点击通知会把窗口带到前面。"
+        case .settingsNotificationsHelp: "Host 等你处理时（工具审批、提问、计划审阅——任何会话都算），以及正在运行的任务结束时，发一条 macOS 通知。无论本应用处于什么状态，等待类通知都会发送；任务结束仅在本应用不在前台时发送。点击通知会把窗口带到前面。"
+        case .settingsChannelHealthy: "通知通道：已连接 Host API"
+        case .settingsChannelUnauthorized: "通知通道：等待 Host 凭证——打开一次页面后会自动恢复"
+        case .settingsChannelReconnecting: "通知通道：正在重连…"
+        case .settingsPageRefresh: "自动刷新页面"
+        case .settingsPageRefreshHelp: "页面连续显示超过一天，或 WebKit 渲染进程内存超过上限时，自动重新加载页面，避免长时间使用积累内存垃圾。只在窗口不可见时执行，Host 等你答复时绝不刷新。"
 
         case .onboardingTitle: "欢迎使用 DSH Bezel"
         case .onboardingSubtitle: "先来连接你的第一个 dsh Host。"
@@ -477,6 +507,7 @@ extension Message {
         case .statusConnected: "已連線"
         case .phaseLocating: "正在尋找可用的 dsh…"
         case .phaseStarting: "正在啟動本機 dsh…"
+        case .phaseCheckingPort: "正在檢查連接埠是否已有 dsh 在執行…"
         case .failureNoDSH: "找不到可用的 dsh（已嘗試 {1} 個位置，詳見下方輸出）"
         case .failureLaunchFailed: "無法啟動 dsh：{1}"
         case .failureExited: "dsh 已結束（狀態碼 {1}）"
@@ -500,8 +531,14 @@ extension Message {
         case .toolbarDisconnect: "中斷連線"
         case .menuManageHosts: "管理 Host…"
         case .buttonConnectSelected: "連線選中的 Host"
+        case .buttonStartDSH: "啟動 dsh"
+        case .buttonRestartDSH: "重新啟動 dsh"
         case .buttonCheckHostSettings: "檢查 Host 設定"
         case .connectPromptTitle: "選擇要連線的 dsh Host"
+        case .portConflictTitle: "連接埠已被執行中的 dsh 佔用"
+        case .portConflictMessage: "連接埠 {1} 上已有一個 dsh 在執行（{2}）。可以直接繫結到它，本應用不會再啟動一個。"
+        case .portConflictBind: "繫結到執行中的 dsh"
+        case .portConflictCancel: "取消"
         case .settingsTabHosts: "Host"
         case .settingsTabGeneral: "一般"
         case .settingsLanguage: "語言"
@@ -533,10 +570,13 @@ extension Message {
         case .notificationAttentionQuestion: "Host 提了一個問題，在等你的回答"
         case .notificationAttentionPlan: "有計畫在等你審閱"
         case .notificationTaskFinished: "任務已結束"
-        case .notificationBackgroundTaskFinished: "背景有任務已結束"
-        case .notificationBackgroundAttention: "有背景對話在等你"
         case .settingsNotifications: "通知"
-        case .settingsNotificationsHelp: "Host 等你處理時（工具核准、提問、計畫審閱——無論在目前頁面還是背景對話），以及正在執行的任務結束時，發一則 macOS 通知。無論本應用程式處於什麼狀態，等待類通知都會傳送；任務結束僅在本應用程式不在前景時傳送。點按通知會把視窗帶到前面。"
+        case .settingsNotificationsHelp: "Host 等你處理時（工具核准、提問、計畫審閱——任何對話都算），以及正在執行的任務結束時，發一則 macOS 通知。無論本應用程式處於什麼狀態，等待類通知都會傳送；任務結束僅在本應用程式不在前景時傳送。點按通知會把視窗帶到前面。"
+        case .settingsChannelHealthy: "通知頻道：已連線 Host API"
+        case .settingsChannelUnauthorized: "通知頻道：等待 Host 憑證——開啟一次頁面後會自動恢復"
+        case .settingsChannelReconnecting: "通知頻道：正在重新連線…"
+        case .settingsPageRefresh: "自動重新整理頁面"
+        case .settingsPageRefreshHelp: "頁面連續顯示超過一天，或 WebKit 渲染程序記憶體超過上限時，自動重新載入頁面，避免長時間使用累積記憶體垃圾。只在視窗不可見時執行，Host 等你答覆時絕不重新整理。"
         case .onboardingTitle: "歡迎使用 DSH Bezel"
         case .onboardingSubtitle: "先來連線你的第一個 dsh Host。"
         case .onboardingSkip: "略過，稍後再設定"
@@ -596,6 +636,7 @@ extension Message {
         case .statusConnected: "接続済み"
         case .phaseLocating: "使用可能な dsh を探しています…"
         case .phaseStarting: "ローカルの dsh を起動しています…"
+        case .phaseCheckingPort: "ポートを既に dsh が使用していないか確認中…"
         case .failureNoDSH: "使用可能な dsh が見つかりません（{1} か所を試しました。詳細は下の出力を参照）"
         case .failureLaunchFailed: "dsh を起動できません：{1}"
         case .failureExited: "dsh が終了しました（ステータス {1}）"
@@ -619,8 +660,14 @@ extension Message {
         case .toolbarDisconnect: "切断"
         case .menuManageHosts: "Host を管理…"
         case .buttonConnectSelected: "選択した Host に接続"
+        case .buttonStartDSH: "dsh を起動"
+        case .buttonRestartDSH: "dsh を再起動"
         case .buttonCheckHostSettings: "Host の設定を確認"
         case .connectPromptTitle: "接続する dsh Host を選択してください"
+        case .portConflictTitle: "ポートは実行中の dsh が使用中です"
+        case .portConflictMessage: "ポート {1} では既に dsh が実行中です（{2}）。その dsh にバインドできます。このアプリは新しい dsh を起動しません。"
+        case .portConflictBind: "実行中の dsh にバインド"
+        case .portConflictCancel: "キャンセル"
         case .settingsTabHosts: "Host"
         case .settingsTabGeneral: "全般"
         case .settingsLanguage: "言語"
@@ -652,10 +699,13 @@ extension Message {
         case .notificationAttentionQuestion: "Host が質問し、回答を待っています"
         case .notificationAttentionPlan: "計画がレビューを待っています"
         case .notificationTaskFinished: "タスクが完了しました"
-        case .notificationBackgroundTaskFinished: "バックグラウンドのタスクが完了しました"
-        case .notificationBackgroundAttention: "応答を待っているバックグラウンドのセッションがあります"
-        case .settingsNotifications: "応答を待っているバックグラウンドのセッションがあります"
-        case .settingsNotificationsHelp: "Host が待っているとき（ツールの承認、質問、計画のレビュー——現在のページでもバックグラウンドのセッションでも）と、実行中のタスクが終わったときに macOS の通知を送ります。アプリの状態にかかわらず、待ち状態は常に通知され、タスクの終了はこのアプリが最前面にないときだけ通知されます。通知をクリックするとウインドウが前面に出ます。"
+        case .settingsNotifications: "通知"
+        case .settingsNotificationsHelp: "Host が待っているとき（ツールの承認、質問、計画のレビュー——どのセッションでも）と、実行中のタスクが終わったときに macOS の通知を送ります。アプリの状態にかかわらず、待ち状態は常に通知され、タスクの終了はこのアプリが最前面にないときだけ通知されます。通知をクリックするとウインドウが前面に出ます。"
+        case .settingsChannelHealthy: "通知チャネル：Host API に接続済み"
+        case .settingsChannelUnauthorized: "通知チャネル：Host の資格情報を待っています——ページを一度開けば自動的に回復します"
+        case .settingsChannelReconnecting: "通知チャネル：再接続中…"
+        case .settingsPageRefresh: "ページの自動再読み込み"
+        case .settingsPageRefreshHelp: "ページの表示が1日を超えたとき、または WebKit コンテンツプロセスのメモリが上限を超えたときに、ページを自動で再読み込みし、長時間の使用でメモリが溜まるのを防ぎます。ウィンドウが見えていないときだけ実行され、Host があなたの回答を待っている間は決して実行されません。"
         case .onboardingTitle: "DSH Bezel へようこそ"
         case .onboardingSubtitle: "まずは最初の dsh Host に接続しましょう。"
         case .onboardingSkip: "スキップ——後で設定する"
@@ -715,6 +765,7 @@ extension Message {
         case .statusConnected: "Connecté"
         case .phaseLocating: "Recherche d'un dsh utilisable…"
         case .phaseStarting: "Démarrage du dsh local…"
+        case .phaseCheckingPort: "Vérification : un dsh sert-il déjà ce port…"
         case .failureNoDSH: "Aucun dsh utilisable trouvé ({1} emplacements essayés ; voir la sortie ci-dessous)"
         case .failureLaunchFailed: "Impossible de lancer dsh : {1}"
         case .failureExited: "dsh s'est arrêté (statut {1})"
@@ -738,8 +789,14 @@ extension Message {
         case .toolbarDisconnect: "Se déconnecter"
         case .menuManageHosts: "Gérer les Hosts…"
         case .buttonConnectSelected: "Connecter l'Host sélectionné"
+        case .buttonStartDSH: "Démarrer dsh"
+        case .buttonRestartDSH: "Redémarrer dsh"
         case .buttonCheckHostSettings: "Vérifier les réglages de l'Host"
         case .connectPromptTitle: "Choisissez un Host dsh auquel vous connecter"
+        case .portConflictTitle: "Port déjà occupé par un dsh en cours"
+        case .portConflictMessage: "Un dsh tourne déjà sur le port {1} ({2}). Vous pouvez vous y lier directement ; cette application n'en démarrera pas un autre."
+        case .portConflictBind: "Se lier au dsh en cours"
+        case .portConflictCancel: "Annuler"
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "Général"
         case .settingsLanguage: "Langue"
@@ -771,10 +828,13 @@ extension Message {
         case .notificationAttentionQuestion: "L'Host a posé une question et attend votre réponse"
         case .notificationAttentionPlan: "Un plan attend votre relecture"
         case .notificationTaskFinished: "La tâche est terminée"
-        case .notificationBackgroundTaskFinished: "Une tâche en arrière-plan est terminée"
-        case .notificationBackgroundAttention: "Une session en arrière-plan vous attend"
         case .settingsNotifications: "Notifications"
-        case .settingsNotificationsHelp: "Une notification macOS quand l'Host vous attend — approbation d'outil, question, relecture de plan, dans cette page ou dans une session en arrière-plan — et quand une tâche en cours se termine. Quel que soit l'état de cette app, une attente est toujours notifiée ; la fin d'une tâche seulement quand cette app n'est pas au premier plan ; un clic ramène la fenêtre devant."
+        case .settingsNotificationsHelp: "Une notification macOS quand l'Host vous attend — approbation d'outil, question, relecture de plan, dans n'importe quelle session — et quand une tâche en cours se termine. Quel que soit l'état de cette app, une attente est toujours notifiée ; la fin d'une tâche seulement quand cette app n'est pas au premier plan ; un clic ramène la fenêtre devant."
+        case .settingsChannelHealthy: "Canal de notification : connecté à l'API de l'Host"
+        case .settingsChannelUnauthorized: "Canal de notification : en attente de l'identifiant de l'Host — ouvrez la page une fois, il se rétablira tout seul"
+        case .settingsChannelReconnecting: "Canal de notification : reconnexion…"
+        case .settingsPageRefresh: "Renouvellement automatique de la page"
+        case .settingsPageRefreshHelp: "Recharge la page de sa propre initiative quand elle est affichée depuis plus d'un jour, ou quand le processus de contenu WebKit dépasse une limite de mémoire, pour éviter qu'un affichage de longue durée n'accumule de la mémoire de rendu. N'arrive que lorsqu'aucune fenêtre n'est visible, et jamais pendant que le Host attend votre réponse."
         case .onboardingTitle: "Bienvenue dans DSH Bezel"
         case .onboardingSubtitle: "Connectons-nous à votre premier Host dsh."
         case .onboardingSkip: "Ignorer — configurer plus tard"
@@ -834,6 +894,7 @@ extension Message {
         case .statusConnected: "Verbunden"
         case .phaseLocating: "Es wird nach einem nutzbaren dsh gesucht…"
         case .phaseStarting: "Lokales dsh wird gestartet…"
+        case .phaseCheckingPort: "Prüfen, ob bereits ein dsh diesen Port belegt…"
         case .failureNoDSH: "Kein nutzbares dsh gefunden ({1} Orte versucht; siehe Ausgabe unten)"
         case .failureLaunchFailed: "dsh konnte nicht gestartet werden: {1}"
         case .failureExited: "dsh wurde beendet (Status {1})"
@@ -857,8 +918,14 @@ extension Message {
         case .toolbarDisconnect: "Trennen"
         case .menuManageHosts: "Hosts verwalten…"
         case .buttonConnectSelected: "Ausgewählten Host verbinden"
+        case .buttonStartDSH: "dsh starten"
+        case .buttonRestartDSH: "dsh neu starten"
         case .buttonCheckHostSettings: "Host-Einstellungen prüfen"
         case .connectPromptTitle: "Wählen Sie einen dsh-Host zum Verbinden"
+        case .portConflictTitle: "Port wird bereits von einem laufenden dsh belegt"
+        case .portConflictMessage: "Auf Port {1} läuft bereits ein dsh ({2}). Sie können dich direkt damit verbinden; diese App startet keinen weiteren."
+        case .portConflictBind: "An laufenden dsh binden"
+        case .portConflictCancel: "Abbrechen"
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "Allgemein"
         case .settingsLanguage: "Sprache"
@@ -890,10 +957,13 @@ extension Message {
         case .notificationAttentionQuestion: "Der Host hat eine Frage gestellt und wartet auf Ihre Antwort"
         case .notificationAttentionPlan: "Ein Plan wartet auf Ihre Durchsicht"
         case .notificationTaskFinished: "Die Aufgabe ist abgeschlossen"
-        case .notificationBackgroundTaskFinished: "Eine Hintergrundaufgabe ist abgeschlossen"
-        case .notificationBackgroundAttention: "Eine Hintergrund-Sitzung wartet auf Sie"
         case .settingsNotifications: "Mitteilungen"
-        case .settingsNotificationsHelp: "Eine macOS-Mitteilung, wenn der Host auf Sie wartet — Werkzeugfreigabe, Frage, Durchsicht eines Plans, auf dieser Seite oder in einer Hintergrund-Sitzung — und wenn eine laufende Aufgabe endet. Der Wartezustand wird in jedem App-Zustand gemeldet; das Ende einer Aufgabe nur, solange diese App nicht im Vordergrund ist; ein Klick holt das Fenster nach vorn."
+        case .settingsNotificationsHelp: "Eine macOS-Mitteilung, wenn der Host auf Sie wartet — Werkzeugfreigabe, Frage, Durchsicht eines Plans, in einer beliebigen Sitzung — und wenn eine laufende Aufgabe endet. Der Wartezustand wird in jedem App-Zustand gemeldet; das Ende einer Aufgabe nur, solange diese App nicht im Vordergrund ist; ein Klick holt das Fenster nach vorn."
+        case .settingsChannelHealthy: "Benachrichtigungskanal: mit der Host-API verbunden"
+        case .settingsChannelUnauthorized: "Benachrichtigungskanal: wartet auf die Host-Anmeldeinformation — einmal die Seite öffnen, dann erholt er sich von selbst"
+        case .settingsChannelReconnecting: "Benachrichtigungskanal: verbindet erneut…"
+        case .settingsPageRefresh: "Seite automatisch erneuern"
+        case .settingsPageRefreshHelp: "Lädt die Seite von selbst neu, wenn sie einen Tag lang läuft oder der WebKit-Content-Prozess ein Speicherlimit überschreitet, damit eine langlebige Anzeige keinen Renderspeicher anhäuft. Geschieht nur, wenn kein Fenster sichtbar ist, und nie, während der Host auf dich wartet."
         case .onboardingTitle: "Willkommen bei DSH Bezel"
         case .onboardingSubtitle: "Verbinden wir uns mit Ihrem ersten dsh-Host."
         case .onboardingSkip: "Überspringen — später einrichten"
@@ -953,6 +1023,7 @@ extension Message {
         case .statusConnected: "Conectado"
         case .phaseLocating: "Buscando un dsh utilizable…"
         case .phaseStarting: "Iniciando el dsh local…"
+        case .phaseCheckingPort: "Comprobando si ya hay un dsh en este puerto…"
         case .failureNoDSH: "No se encontró ningún dsh utilizable (se probaron {1} ubicaciones; consulta la salida de abajo)"
         case .failureLaunchFailed: "No se pudo iniciar dsh: {1}"
         case .failureExited: "dsh terminó (estado {1})"
@@ -976,8 +1047,14 @@ extension Message {
         case .toolbarDisconnect: "Desconectar"
         case .menuManageHosts: "Gestionar Hosts…"
         case .buttonConnectSelected: "Conectar el Host seleccionado"
+        case .buttonStartDSH: "Iniciar dsh"
+        case .buttonRestartDSH: "Reiniciar dsh"
         case .buttonCheckHostSettings: "Revisar los ajustes del Host"
         case .connectPromptTitle: "Elige un Host de dsh al que conectarte"
+        case .portConflictTitle: "El puerto ya está ocupado por un dsh en ejecución"
+        case .portConflictMessage: "Ya hay un dsh ejecutándose en el puerto {1} ({2}). Puedes enlazarte a él directamente; esta app no iniciará otro."
+        case .portConflictBind: "Enlazar al dsh en ejecución"
+        case .portConflictCancel: "Cancelar"
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "General"
         case .settingsLanguage: "Idioma"
@@ -1009,10 +1086,13 @@ extension Message {
         case .notificationAttentionQuestion: "El Host hizo una pregunta y espera tu respuesta"
         case .notificationAttentionPlan: "Hay un plan esperando tu revisión"
         case .notificationTaskFinished: "La tarea ha terminado"
-        case .notificationBackgroundTaskFinished: "Una tarea en segundo plano ha terminado"
-        case .notificationBackgroundAttention: "Una sesión en segundo plano te está esperando"
         case .settingsNotifications: "Notificaciones"
-        case .settingsNotificationsHelp: "Una notificación de macOS cuando el Host te espera —aprobación de una herramienta, una pregunta, la revisión de un plan, en esta página o en una sesión en segundo plano— y cuando termina una tarea en curso. Sea cual sea el estado de la app, una espera siempre se notifica; el fin de una tarea solo mientras la app no está en primer plano; al hacer clic, la ventana pasa al frente."
+        case .settingsNotificationsHelp: "Una notificación de macOS cuando el Host te espera —aprobación de una herramienta, una pregunta, la revisión de un plan, en cualquier sesión— y cuando termina una tarea en curso. Sea cual sea el estado de la app, una espera siempre se notifica; el fin de una tarea solo mientras la app no está en primer plano; al hacer clic, la ventana pasa al frente."
+        case .settingsChannelHealthy: "Canal de notificaciones: conectado a la API del Host"
+        case .settingsChannelUnauthorized: "Canal de notificaciones: esperando la credencial del Host — abre la página una vez y se recuperará solo"
+        case .settingsChannelReconnecting: "Canal de notificaciones: reconectando…"
+        case .settingsPageRefresh: "Renovación automática de la página"
+        case .settingsPageRefreshHelp: "Recarga la página por su cuenta cuando lleva un día abierta, o cuando el proceso de contenido de WebKit supera un límite de memoria, para que una pantalla de larga duración no acumule memoria de renderizado. Ocurre solo cuando ninguna ventana está visible, y nunca mientras el Host espera tu respuesta."
         case .onboardingTitle: "Bienvenido a DSH Bezel"
         case .onboardingSubtitle: "Vamos a conectar con tu primer Host de dsh."
         case .onboardingSkip: "Omitir: configurar más tarde"

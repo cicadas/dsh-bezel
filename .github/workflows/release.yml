@@ -1,0 +1,70 @@
+# Build and publish a distributable macOS app on every v* tag.
+#
+# The pipeline deliberately stays thin: scripts/make-release.sh already owns
+# the whole assembly (universal build, ad-hoc signing, DMG, zip, checksums,
+# and byte-for-byte verification), so CI only checks out, stamps the tag's
+# version into Info.plist, runs the tests, and uploads what the script
+# produced. A manual workflow_dispatch run skips the release and keeps the
+# artifacts on the run page instead, which makes it the dry-run button for
+# the pipeline before cutting a real tag.
+#
+# Signing: the runner has no Developer ID identity, so the bundle ships
+# ad-hoc signed (the script keeps the notarizable --options runtime shape);
+# the first launch on another machine needs right-click > Open. Once a real
+# identity exists, add an import-signing step and pass CODESIGN_IDENTITY to
+# make-release.sh — no other change is needed.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Any image whose SDK covers the macOS 15 deployment target works; keep
+    # the moving alias so image deprecations never break the pipeline.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp the tag version into Info.plist
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" Resources/Info.plist
+          echo "building version $version (tag $GITHUB_REF_NAME)"
+
+      - name: Run the tests
+        run: swift test --disable-sandbox
+
+      - name: Build the release
+        run: ./scripts/make-release.sh
+
+      - name: Upload artifacts (manual runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: DSH-Bezel-dist
+          path: build/release/*
+          if-no-files-found: error
+
+      - name: Publish the release (tag pushes)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "DSH Bezel $version" \
+            --generate-notes \
+            build/release/DSH-Bezel-$version.dmg \
+            build/release/DSH-Bezel-$version.zip \
+            build/release/DSH-Bezel-$version.sha256

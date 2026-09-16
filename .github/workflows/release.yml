@@ -8,12 +8,6 @@
 # artifacts on the run page instead, which makes it the dry-run button for
 # the pipeline before cutting a real tag.
 #
-# Packaging belongs to main. GitHub tag events carry no branch context — a
-# v* tag cut on any line fires this workflow — so a cheap Ubuntu gate job
-# checks that the tagged commit is an ancestor of origin/main and skips the
-# macOS job otherwise (the run stays green; the gate log carries a notice).
-# Manual runs are refused unless launched from main itself.
-#
 # Signing: the runner has no Developer ID identity, so the bundle ships
 # ad-hoc signed (the script keeps the notarizable --options runtime shape);
 # the first launch on another machine needs right-click > Open. Once a real
@@ -34,32 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      proceed: ${{ steps.check.outputs.proceed }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: check
-        name: Only main's history may be packaged
-        run: |
-          if ! git fetch --no-tags origin main; then
-            echo "::error::origin/main is missing — push the main branch before tagging"
-            exit 1
-          fi
-          if git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::$GITHUB_REF_NAME is not on main; packaging skipped (releases build from main only)"
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-          fi
-
   release:
-    needs: gate
-    if: needs.gate.outputs.proceed == 'true' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
     # Any image whose SDK covers the macOS 15 deployment target works; keep
     # the moving alias so image deprecations never break the pipeline.
     runs-on: macos-latest

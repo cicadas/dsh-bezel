@@ -124,6 +124,33 @@ struct BezelApp: App {
         .windowToolbarStyle(.unifiedCompact)
         .commands {
             CommandGroup(replacing: .newItem) { }
+            // The find menu speaks to the selected tab's page through the
+            // same command channel the toolbar uses. It sits in the Edit
+            // menu as a submenu, the shape Safari and Chrome use; match
+            // navigation is only offered while that tab's find bar is
+            // actually open, mirroring how AppKit validates the underlying
+            // actions.
+            CommandGroup(after: .textEditing) {
+                Menu {
+                    Button(app.text(.menuFind)) { app.openFind() }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .disabled(!app.canFind)
+
+                    Button(app.text(.menuFindNext)) { app.findNext() }
+                        .keyboardShortcut("g", modifiers: .command)
+                        .disabled(!app.isFindBarVisible)
+
+                    Button(app.text(.menuFindPrevious)) { app.findPrevious() }
+                        .keyboardShortcut("g", modifiers: [.command, .shift])
+                        .disabled(!app.isFindBarVisible)
+
+                    Button(app.text(.menuUseSelectionForFind)) { app.useSelectionForFind() }
+                        .keyboardShortcut("e", modifiers: .command)
+                        .disabled(!app.canFind)
+                } label: {
+                    Text(app.text(.menuFindTitle))
+                }
+            }
         }
 
         Settings {

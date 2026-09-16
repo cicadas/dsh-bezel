@@ -5,7 +5,8 @@
 A native macOS shell that loads a dsh Host's own Web UI
 straight into a `WKWebView`, and adds exactly what a shell can legitimately add
 around a display: **choosing which dsh to connect to**, **knowing when the
-display is calling for you**, and **an interface language of its own**.
+display is calling for you**, **finding text on the page the way a browser
+does**, and **an interface language of its own**.
 
 The full engineering design — the wire contract, the decision rules, the state
 model, the source map — lives in [architecture.md](architecture.md). This
@@ -87,6 +88,22 @@ offers a restart button for exactly that.
 This setting covers this app's own interface only. The Host's Web UI is served
 by the Host and keeps its own language setting.
 
+## Find in page
+
+⌘F opens the standard macOS find bar over the page — AppKit's `NSTextFinder`
+driving WebKit's own find machinery, the same bar, incremental search and
+match feedback that TextEdit and Preview use. Nothing is injected into the
+page to search it.
+
+Enter or ⌘G jumps to the next match, ⇧⌘G (or Shift-Enter) to the previous;
+Esc or the bar's Done button closes it; ⌘E takes the selected text as the
+search string (Edit → Find). A line left of the bar reports how many matches
+the search found. The bar belongs to each tab — every tab keeps its own
+search — and a reload, manual or automatic, re-runs the current search over
+the fresh page. One browser habit is missing: switching tabs does not carry
+the query along, because AppKit's public find interface offers no way to hand
+the bar's text to another web view.
+
 ## Settings
 
 The Settings window (toolbar Host menu → Manage Hosts…, or ⌘,) has two tabs.
@@ -130,6 +147,7 @@ native client that reimplements the wire protocol.
 | macOS notifications | none | none | yes — waits and finishes, in any session | yes |
 | Bookmarks, managed child, first-launch guide | none | none | yes | yes |
 | Interface languages | the Host's own | its own | seven, including the menu bar | its own |
+| Page search (⌘F) | the browser's own | varies | yes — WebKit's own find machinery, nothing injected | yes |
 | Memory beside the page | none | a second, bundled browser engine | a socket | a native interface |
 
 - **Versus the tab**: the page is identical — this app never improves it. What

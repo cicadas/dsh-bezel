@@ -2,7 +2,7 @@
 
 [English](../README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md) · **Français** · [Deutsch](README.de.md) · [Español](README.es.md)
 
-Une enveloppe macOS native qui charge la propre Web UI d'un Host dsh directement dans une `WKWebView`, et n'ajoute autour de l'écran que ce qu'une enveloppe peut légitimement ajouter : **choisir à quel dsh se connecter**, **savoir quand l'écran vous appelle**, et **une langue d'interface qui lui appartient**.
+Une enveloppe macOS native qui charge la propre Web UI d'un Host dsh directement dans une `WKWebView`, et n'ajoute autour de l'écran que ce qu'une enveloppe peut légitimement ajouter : **choisir à quel dsh se connecter**, **savoir quand l'écran vous appelle**, **chercher du texte dans la page comme un navigateur**, et **une langue d'interface qui lui appartient**.
 
 Le design d'ingénierie complet — le contrat câblé, les règles de décision, le modèle d'état, la carte des sources — vit dans [architecture.md](../architecture.md), en anglais uniquement. Ce README garde la forme du design, comment utiliser l'app, et comment elle se compare aux autres outils.
 
@@ -47,6 +47,12 @@ La seule partie qui ne peut pas basculer en pleine session, c'est la barre de me
 
 Ce réglage ne couvre que l'interface de cette app. La Web UI du Host est servie par le Host et garde sa propre langue.
 
+## Recherche dans la page
+
+⌘F ouvre la barre de recherche macOS standard au-dessus de la page — le `NSTextFinder` d'AppKit pilotant le mécanisme de recherche propre à WebKit : la même barre, la même recherche incrémentale et le même retour visuel que TextEdit et Aperçu. Rien n'est injecté dans la page pour la rechercher.
+
+Entrée ou ⌘G saute au résultat suivant, ⇧⌘G (ou Maj-Entrée) au précédent ; Échap ou « Terminer » ferme la barre ; ⌘E prend le texte sélectionné comme chaîne de recherche (Édition → Rechercher). Une ligne à gauche de la barre indique combien de résultats la recherche a trouvés. La barre appartient à chaque onglet — chacun garde sa propre recherche — et un rechargement, manuel ou automatique, relance la recherche en cours sur la page fraîche. Une habitude de navigateur manque : changer d'onglet n'emporte pas la requête, car l'interface de recherche publique d'AppKit ne permet pas de transmettre le texte de la barre à une autre vue web.
+
 ## Réglages
 
 La fenêtre Réglages (menu Host de la barre d'outils → Gérer les Hosts…, ou ⌘,) a deux onglets.
@@ -86,6 +92,7 @@ Tout outil qui met une Web UI dsh dans une fenêtre est l'une de trois formes : 
 | Notifications macOS | aucune | aucune | oui — attentes et fins, dans n'importe quelle session | oui |
 | Signets, enfant géré, guide de premier lancement | aucun | aucun | oui | oui |
 | Langues de l'interface | celle du Host | les siennes | sept, barre de menus comprise | les siennes |
+| Recherche dans la page (⌘F) | celle du navigateur | selon l'outil | oui — le mécanisme de recherche propre à WebKit, sans injection | oui |
 | Mémoire outre la page | aucune | un second moteur de navigateur embarqué | un socket | une interface native |
 
 - **Face à l'onglet** : la page est identique — cette app ne l'améliore jamais. Ce que l'enveloppe ajoute vit entièrement autour d'elle : les signets et l'enfant géré pour qu'ouvrir l'app suffise, les notifications pour qu'un Host en attente ne passe pas inaperçu, le renouvellement pour qu'un écran laissé ouvert des semaines reste sain, et la gestion des langues.

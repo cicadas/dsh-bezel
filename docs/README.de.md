@@ -2,7 +2,7 @@
 
 [English](../README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md) · [Français](README.fr.md) · **Deutsch** · [Español](README.es.md)
 
-Eine native macOS-Hülle, die die eigene Web UI eines dsh-Host direkt in ein `WKWebView` lädt — und um den Bildschirm herum nur ergänzt, was eine Hülle rechtmäßig ergänzen kann: **die Wahl, mit welchem dsh verbunden wird**, **das Wissen, wenn der Bildschirm Sie ruft**, und **eine eigene Sprache der Oberfläche**.
+Eine native macOS-Hülle, die die eigene Web UI eines dsh-Host direkt in ein `WKWebView` lädt — und um den Bildschirm herum nur ergänzt, was eine Hülle rechtmäßig ergänzen kann: **die Wahl, mit welchem dsh verbunden wird**, **das Wissen, wenn der Bildschirm Sie ruft**, **das Suchen von Text auf der Seite wie im Browser**, und **eine eigene Sprache der Oberfläche**.
 
 Den vollständigen technischen Entwurf — den Drahtvertrag, die Entscheidungsregeln, das Zustandsmodell, die Quellübersicht — führt [architecture.md](../architecture.md) (nur auf Englisch). Dieses README bewahrt den Umriss des Entwurfs, die Bedienung der App und das Verhältnis zu den Alternativen.
 
@@ -47,6 +47,12 @@ Der einzige Teil, der sich nicht mitten in einer Sitzung umschalten lässt, ist 
 
 Diese Einstellung deckt nur die eigene Oberfläche dieser App ab. Die Web UI des Hosts wird vom Host ausgeliefert und behält ihre eigene Sprache.
 
+## Suche auf der Seite
+
+⌘F öffnet die Standard-macOS-Suchleiste über der Seite — AppKits `NSTextFinder`, der WebKits eigene Suchmaschinerie antreibt: dieselbe Leiste, dieselbe inkrementelle Suche und dasselbe Treffer-Feedback wie in TextEdit und Vorschau. Nichts wird in die Seite injiziert, um sie zu durchsuchen.
+
+Enter oder ⌘G springt zum nächsten Treffer, ⇧⌘G (oder Umschalt-Enter) zum vorherigen; Esc oder „Fertig" in der Leiste schließt sie; ⌘E nimmt den ausgewählten Text als Suchzeichenkette (Bearbeiten → Suchen). Eine Zeile links der Leiste meldet, wie viele Treffer die Suche gefunden hat. Die Leiste gehört jeweils zum Tab — jeder Tab behält seine eigene Suche — und ein Neuladen, manuell oder automatisch, führt die aktuelle Suche über die frische Seite erneut aus. Eine Browser-Gewohnheit fehlt: Der Tabwechsel nimmt die Suchanfrage nicht mit, denn AppKits öffentliche Suchschnittstelle bietet keine Möglichkeit, den Text der Leiste an eine andere Web-View zu übergeben.
+
 ## Einstellungen
 
 Das Einstellungen-Fenster (Host-Menü der Werkzeugleiste → Hosts verwalten…, oder ⌘,) hat zwei Reiter.
@@ -86,6 +92,7 @@ Jedes Werkzeug, das eine dsh-Web-UI in ein Fenster setzt, hat eine von drei Form
 | macOS-Benachrichtigungen | keine | keine | ja — Warten und Beendigungen, in jeder Sitzung | ja |
 | Lesezeichen, verwaltetes Kind, Anleitung beim ersten Start | keine | keine | ja | ja |
 | Sprachen der Oberfläche | die eigene des Hosts | ihre eigene | sieben, einschließlich der Menüleiste | ihre eigene |
+| Suche auf der Seite (⌘F) | die des Browsers | je nach Werkzeug | ja — WebKits eigene Suchmaschinerie, nichts injiziert | ja |
 | Speicher neben der Seite | keiner | eine zweite, mitgelieferte Browser-Engine | ein Socket | eine native Oberfläche |
 
 - **Gegenüber dem Tab**: Die Seite ist identisch — diese App verbessert sie nie. Was die Hülle ergänzt, lebt ganz um sie herum: Lesezeichen und verwaltetes Kind, damit das Öffnen der App genügt; Benachrichtigungen, damit ein wartender Host nicht verpasst wird; die Erneuerung, damit eine Anzeige, die wochenlang offen steht, gesund bleibt; und die Sprachbehandlung.

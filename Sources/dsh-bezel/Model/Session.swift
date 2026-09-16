@@ -232,6 +232,9 @@ final class Session: Identifiable {
         summonsActive = false
         portConflict = nil
         isCheckingPort = false
+        // The WebView goes away with the page; a pending find directive must
+        // not survive to open a bar over whatever this tab attaches to next.
+        findCommand = nil
     }
 
     /// Tear down every live resource, for app termination.
@@ -245,6 +248,29 @@ final class Session: Identifiable {
         reloadToken &+= 1
         // Nothing to reset here: the notification channel reads the Host's
         // API, not the page, so a page reload is not a gap in its facts.
+    }
+
+    // MARK: - Find in page
+
+    /// Latest find directive for this tab's WebView. Observed: MainView hands
+    /// it to the representable, whose coordinator applies it when the token
+    /// moves. Reset on detach so a stale directive can never act on the next
+    /// page this tab connects to.
+    private(set) var findCommand: PageFindCommand?
+    @ObservationIgnored private var findToken = 0
+
+    /// The match-count line for the find bar, worded in the current language.
+    /// Only a live search with matches shows a count; "no matches" stays
+    /// silent, the way Safari's bar does — the public search machinery offers
+    /// no way to tell an empty query from a fruitless one.
+    var findCountText: String? {
+        guard web.findBarVisible, let count = web.findMatchCount, count > 0 else { return nil }
+        return text(.findMatchesFound, String(count))
+    }
+
+    func sendFind(_ action: PageFindCommand.Action) {
+        findToken &+= 1
+        findCommand = PageFindCommand(token: findToken, action: action)
     }
 
     func apply(_ state: WebViewState) {

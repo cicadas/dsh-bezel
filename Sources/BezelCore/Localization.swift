@@ -90,6 +90,14 @@ public enum Message: CaseIterable, Sendable {
     case portConflictBind
     case portConflictCancel
 
+    // Find in page
+    case menuFindTitle
+    case menuFind
+    case menuFindNext
+    case menuFindPrevious
+    case menuUseSelectionForFind
+    case findMatchesFound
+
     // Settings
     case settingsTabHosts
     case settingsTabGeneral
@@ -275,6 +283,13 @@ extension Message {
         case .portConflictBind: "Bind to the Running dsh"
         case .portConflictCancel: "Cancel"
 
+        case .menuFindTitle: "Find"
+case .menuFind: "Find…"
+        case .menuFindNext: "Find Next"
+        case .menuFindPrevious: "Find Previous"
+        case .menuUseSelectionForFind: "Use Selection for Find"
+        case .findMatchesFound: "{1} found"
+
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "General"
         case .settingsLanguage: "Language"
@@ -413,6 +428,13 @@ extension Message {
         case .portConflictBind: "绑定到运行中的 dsh"
         case .portConflictCancel: "取消"
 
+        case .menuFindTitle: "查找"
+case .menuFind: "查找…"
+        case .menuFindNext: "查找下一个"
+        case .menuFindPrevious: "查找上一个"
+        case .menuUseSelectionForFind: "用所选内容查找"
+        case .findMatchesFound: "找到 {1} 处"
+
         case .settingsTabHosts: "Host"
         case .settingsTabGeneral: "通用"
         case .settingsLanguage: "语言"
@@ -547,6 +569,12 @@ extension Message {
         case .portConflictMessage: "連接埠 {1} 上已有一個 dsh 在執行（{2}）。可以直接繫結到它，本應用不會再啟動一個。"
         case .portConflictBind: "繫結到執行中的 dsh"
         case .portConflictCancel: "取消"
+        case .menuFindTitle: "尋找"
+case .menuFind: "尋找…"
+        case .menuFindNext: "尋找下一個"
+        case .menuFindPrevious: "尋找上一個"
+        case .menuUseSelectionForFind: "使用所選內容尋找"
+        case .findMatchesFound: "找到 {1} 處"
         case .settingsTabHosts: "Host"
         case .settingsTabGeneral: "一般"
         case .settingsLanguage: "語言"
@@ -678,6 +706,12 @@ extension Message {
         case .portConflictMessage: "ポート {1} では既に dsh が実行中です（{2}）。その dsh にバインドできます。このアプリは新しい dsh を起動しません。"
         case .portConflictBind: "実行中の dsh にバインド"
         case .portConflictCancel: "キャンセル"
+        case .menuFindTitle: "検索"
+case .menuFind: "検索…"
+        case .menuFindNext: "次を検索"
+        case .menuFindPrevious: "前を検索"
+        case .menuUseSelectionForFind: "選択範囲を検索に使用"
+        case .findMatchesFound: "{1} 件見つかりました"
         case .settingsTabHosts: "Host"
         case .settingsTabGeneral: "全般"
         case .settingsLanguage: "言語"
@@ -809,6 +843,12 @@ extension Message {
         case .portConflictMessage: "Un dsh tourne déjà sur le port {1} ({2}). Vous pouvez vous y lier directement ; cette application n'en démarrera pas un autre."
         case .portConflictBind: "Se lier au dsh en cours"
         case .portConflictCancel: "Annuler"
+        case .menuFindTitle: "Rechercher"
+case .menuFind: "Rechercher…"
+        case .menuFindNext: "Suivant"
+        case .menuFindPrevious: "Précédent"
+        case .menuUseSelectionForFind: "Utiliser la sélection pour rechercher"
+        case .findMatchesFound: "{1} résultats"
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "Général"
         case .settingsLanguage: "Langue"
@@ -940,6 +980,12 @@ extension Message {
         case .portConflictMessage: "Auf Port {1} läuft bereits ein dsh ({2}). Sie können dich direkt damit verbinden; diese App startet keinen weiteren."
         case .portConflictBind: "An laufenden dsh binden"
         case .portConflictCancel: "Abbrechen"
+        case .menuFindTitle: "Suchen"
+case .menuFind: "Suchen…"
+        case .menuFindNext: "Weiter"
+        case .menuFindPrevious: "Zurück"
+        case .menuUseSelectionForFind: "Auswahl zum Suchen verwenden"
+        case .findMatchesFound: "{1} gefunden"
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "Allgemein"
         case .settingsLanguage: "Sprache"
@@ -1071,6 +1117,12 @@ extension Message {
         case .portConflictMessage: "Ya hay un dsh ejecutándose en el puerto {1} ({2}). Puedes enlazarte a él directamente; esta app no iniciará otro."
         case .portConflictBind: "Enlazar al dsh en ejecución"
         case .portConflictCancel: "Cancelar"
+        case .menuFindTitle: "Buscar"
+case .menuFind: "Buscar…"
+        case .menuFindNext: "Siguiente"
+        case .menuFindPrevious: "Anterior"
+        case .menuUseSelectionForFind: "Usar la selección para buscar"
+        case .findMatchesFound: "{1} resultados"
         case .settingsTabHosts: "Hosts"
         case .settingsTabGeneral: "General"
         case .settingsLanguage: "Idioma"

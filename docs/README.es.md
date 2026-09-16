@@ -2,7 +2,7 @@
 
 [English](../README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · **Español**
 
-Una carcasa nativa de macOS que carga la propia Web UI de un Host de dsh directamente en un `WKWebView`, y añade alrededor de la pantalla exactamente lo que una carcasa puede añadir legítimamente: **elegir a qué dsh conectarse**, **saber cuándo la pantalla te llama**, y **un idioma de interfaz propio**.
+Una carcasa nativa de macOS que carga la propia Web UI de un Host de dsh directamente en un `WKWebView`, y añade alrededor de la pantalla exactamente lo que una carcasa puede añadir legítimamente: **elegir a qué dsh conectarse**, **saber cuándo la pantalla te llama**, **buscar texto en la página como lo hace un navegador**, y **un idioma de interfaz propio**.
 
 El diseño de ingeniería completo — el contrato del cable, las reglas de decisión, el modelo de estado, el mapa del código fuente — vive en [architecture.md](../architecture.md), que por ahora está solo en inglés. Este README conserva la forma del diseño, cómo usar la app y cómo se compara con las alternativas.
 
@@ -47,6 +47,12 @@ La única parte que no puede cambiar en mitad de la sesión es la barra de menú
 
 Este ajuste cubre solo la interfaz de esta app. La Web UI del Host la sirve el Host y mantiene su propio idioma.
 
+## Búsqueda en la página
+
+⌘F abre la barra de búsqueda estándar de macOS sobre la página — el `NSTextFinder` de AppKit impulsando el mecanismo de búsqueda propio de WebKit: la misma barra, la misma búsqueda incremental y las mismas señales de coincidencia que TextEdit y Vista previa. No se inyecta nada en la página para buscarla.
+
+Enter o ⌘G salta a la siguiente coincidencia, ⇧⌘G (o Mayús-Enter) a la anterior; Esc o «OK» en la barra la cierra; ⌘E toma el texto seleccionado como cadena de búsqueda (Edición → Buscar). Una línea a la izquierda de la barra informa de cuántas coincidencias encontró la búsqueda. La barra pertenece a cada pestaña — cada una conserva su propia búsqueda — y una recarga, manual o automática, vuelve a ejecutar la búsqueda actual sobre la página fresca. Falta una costumbre de navegador: cambiar de pestaña no se lleva la consulta, porque la interfaz pública de búsqueda de AppKit no ofrece forma de entregar el texto de la barra a otra vista web.
+
 ## Ajustes
 
 La ventana de Ajustes (menú Host de la barra de herramientas → Gestionar Hosts…, o ⌘,) tiene dos pestañas.
@@ -86,6 +92,7 @@ Toda herramienta que mete una Web UI de dsh en una ventana es una de tres formas
 | Notificaciones de macOS | ninguna | ninguna | sí — esperas y terminaciones, en cualquier sesión | sí |
 | Marcadores, hijo gestionado, guía de primer arranque | nada | nada | sí | sí |
 | Idiomas de interfaz | el propio del Host | los suyos | siete, barra de menús incluida | los suyos |
+| Búsqueda en la página (⌘F) | la del navegador | según la herramienta | sí — el mecanismo de búsqueda propio de WebKit, sin inyección | sí |
 | Memoria además de la página | ninguna | un segundo motor de navegador empaquetado | un socket | una interfaz nativa |
 
 - **Frente a la pestaña**: la página es idéntica — esta app jamás la mejora. Lo que la carcasa añade vive por completo alrededor de ella: los marcadores y el hijo gestionado para que abrir la app baste, las notificaciones para que no se pase por alto un Host en espera, la renovación para que una pantalla dejada abierta semanas siga sana, y el manejo de idiomas.

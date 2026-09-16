@@ -13,8 +13,9 @@ what the app does and how to use it — read the [README](README.md).
   neither modifies nor interprets the page.
 - **The page is never touched.** Nothing is injected into it, nothing is read
   back from it, and its view state is nobody's business but the page's. The
-  only thing the app ever does to the page is load it, reload it on its own
-  schedule (Page renewal), and report navigation facts (loading, title,
+  only things the app ever does with the page are load it, reload it on its
+  own schedule (Page renewal), search within it through WebKit's own find
+  machinery (Find in page), and report navigation facts (loading, title,
   401) that WebKit hands out anyway.
 - **Notifications are Host API facts, listened to passively.** The app
   subscribes to a narrow slice of the Host's own API and never answers
@@ -239,6 +240,40 @@ the user to hide the window fires within moments of that; a five-minute clock
 covers the quiet stretches. The clock runs only while a Host is attached, and
 Settings → General has the switch, on by default.
 
+## Find in page
+
+A display one reads for hours needs the one interaction every browser has:
+⌘F. The display-only principle decides the shape of the feature, and it
+points at the native answer: the search is **AppKit's `NSTextFinder` driving
+the `WKWebView`'s own `NSTextFinderClient`** — the same machinery, bar and
+match feedback that TextEdit and Preview use. Nothing is injected into the
+page and nothing is read back from it: the searching happens inside WebKit,
+and this app contributes exactly two things — where the bar sits (top-
+trailing, as browsers put it, in a small `FindBarHost` view over the page)
+and what the rest of the interface knows about the search.
+
+- **The bar is AppKit's.** `NSTextFinder` builds the standard find bar and
+  hands it to the container; Enter, Shift-Enter, ⌘G, ⇧⌘G, Esc and the Done
+  button are its own, as is the background incremental search and its
+  system-language localization. The app's menu commands (⌘F, ⌘G, ⇧⌘G, ⌘E
+  under Edit → Find) only call `performAction` on the selected tab's finder,
+  over the same command-token channel the reload button uses.
+- **The count is public.** `incrementalMatchRanges` is KVO-observable and
+  carries every match the incremental search has found; its size is the
+  number shown left of the bar. The precise "3 of 42" position is not
+  exposed by the public API, so the line reads "42 found" and stays silent
+  while there is nothing to count — the way Safari's bar stays silent.
+- **The bar is per tab.** Each tab's `WKWebView` has its own finder and its
+  own bar session, so switching tabs shows the target tab's bar state as
+  that tab left it. What is traded against the browsers: the query does not
+  follow the user across tabs, because AppKit's public interface offers no
+  way to set the bar's text — the field is AppKit's own.
+- **Reloads keep the search.** A manual reload or a page renewal replaces
+  the page's text wholesale; `noteClientStringWillChange` at provisional
+  navigation is the public hook that tells the incremental search to re-run
+  over the new document, so the bar keeps working across the renewal the
+  same way it keeps working while the SPA streams new text.
+
 ## What is remembered
 
 Everything the app knows lives in one JSON file:
@@ -297,6 +332,8 @@ Sources/dsh-bezel/          app and UI
   Model/AppState.swift      config / child process / WebView glue, connection status, notification wording
   Model/Notifier.swift      macOS notification delivery and the two delivery rules
   Web/WebView.swift         WKWebView host and navigation state reporting — a pure display
+  Web/FindBarHost.swift     the AppKit strip hosting the system find bar over the page
+  Web/PageFind.swift        the find directive the UI hands to a tab's WebView
   Web/WebKitCredentials.swift  the page's cookies, handed to the notification channel
   UI/MainView.swift         toolbar, Host picker, connect prompt, error banner
   UI/OnboardingView.swift   the first-launch guide
@@ -324,7 +361,7 @@ Tests/BezelCoreTests/       address normalisation, startup-line parsing, config 
   and `com.apple.security.network.client` yourself.
 - **Scope**: this app contributes no features of its own to the conversation —
   what the Web UI has is what you get. Around the display it adds the Host
-  picker, notifications, languages and the first-launch guide.
+  picker, notifications, find-in-page, languages and the first-launch guide.
 - **Prerequisites**: a dsh Host that can serve a Web UI. `dsh web`'s startup line
   and the `?token=` exchange have been stable since 0.1.5-rc.1.
 

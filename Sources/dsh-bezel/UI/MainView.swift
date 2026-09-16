@@ -37,7 +37,12 @@ struct MainView: View {
     @ViewBuilder
     private func sessionContent(_ session: Session) -> some View {
         if let url = session.currentURL {
-            WebView(url: url, reloadToken: session.reloadToken) { state in
+            WebView(
+                url: url,
+                reloadToken: session.reloadToken,
+                findCommand: session.findCommand,
+                findCountText: session.findCountText
+            ) { state in
                 session.apply(state)
             }
             .overlay(alignment: .top) { errorBanner(for: session) }

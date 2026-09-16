@@ -220,6 +220,21 @@ final class AppState {
 
     func openInBrowser() { selectedSession.openInBrowser() }
 
+    // MARK: - Find in page
+
+    /// Find acts on the selected tab's page, so it is available exactly when
+    /// a page is.
+    var canFind: Bool { currentURL != nil }
+
+    /// Whether the selected tab's find bar is over its page; gates the match
+    /// navigation menu items, mirroring AppKit's own action validation.
+    var isFindBarVisible: Bool { selectedSession.web.findBarVisible }
+
+    func openFind() { selectedSession.sendFind(.show) }
+    func findNext() { selectedSession.sendFind(.next) }
+    func findPrevious() { selectedSession.sendFind(.previous) }
+    func useSelectionForFind() { selectedSession.sendFind(.useSelection) }
+
     // MARK: - First-launch guide
 
     /// Whether the first-launch guide is still due. Read by `MainView` to

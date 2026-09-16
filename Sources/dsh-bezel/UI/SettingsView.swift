@@ -43,10 +43,10 @@ struct HostsSettings: View {
 
                     Button {
                         if let id = selection {
-                            // Removing the attached Host also drops its
-                            // connection, so a managed child does not outlive
-                            // its bookmark.
-                            if app.attachedHostID == id { app.detach() }
+                            // Removing a Host also detaches every tab bound
+                            // to it, so a managed child does not outlive its
+                            // bookmark.
+                            app.closeTabs(forHost: id)
                             app.config.remove(id: id)
                             // And the editor must not keep showing the
                             // removed bookmark as if it were still editable.

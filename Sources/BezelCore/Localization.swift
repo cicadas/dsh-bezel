@@ -179,6 +179,10 @@ public enum Message: CaseIterable, Sendable {
     case onboardingBindHostName
     case settingsFieldLaunchCommand
     case settingsFieldLaunchCommandPrompt
+
+    // Tabs
+    case tabNewTab
+    case tabClose
 }
 
 /// The text of one message in one language, with `{1}`, `{2}`… filled in.
@@ -356,6 +360,8 @@ extension Message {
         case .onboardingBindHostName: "Running dsh"
         case .settingsFieldLaunchCommand: "Custom start command (optional)"
         case .settingsFieldLaunchCommandPrompt: "leave empty for the standard invocation"
+        case .tabNewTab: "New Tab"
+        case .tabClose: "Close Tab"
         }
     }
 
@@ -492,6 +498,8 @@ extension Message {
         case .onboardingBindHostName: "运行中的 dsh"
         case .settingsFieldLaunchCommand: "自定义启动命令（可选）"
         case .settingsFieldLaunchCommandPrompt: "留空则使用标准启动命令"
+        case .tabNewTab: "新建标签页"
+        case .tabClose: "关闭标签页"
         }
     }
 
@@ -621,6 +629,8 @@ extension Message {
         case .onboardingBindHostName: "執行中的 dsh"
         case .settingsFieldLaunchCommand: "自訂啟動命令（選填）"
         case .settingsFieldLaunchCommandPrompt: "留空則使用標準啟動命令"
+        case .tabNewTab: "新增分頁"
+        case .tabClose: "關閉分頁"
         }
     }
 
@@ -750,6 +760,8 @@ extension Message {
         case .onboardingBindHostName: "実行中の dsh"
         case .settingsFieldLaunchCommand: "カスタム起動コマンド（省略可）"
         case .settingsFieldLaunchCommandPrompt: "空欄にすると標準の起動方法を使います"
+        case .tabNewTab: "新しいタブ"
+        case .tabClose: "タブを閉じる"
         }
     }
 
@@ -879,6 +891,8 @@ extension Message {
         case .onboardingBindHostName: "dsh en cours d'exécution"
         case .settingsFieldLaunchCommand: "Commande de démarrage personnalisée (facultatif)"
         case .settingsFieldLaunchCommandPrompt: "laisser vide pour l'invocation standard"
+        case .tabNewTab: "Nouvel onglet"
+        case .tabClose: "Fermer l'onglet"
         }
     }
 
@@ -1008,6 +1022,8 @@ extension Message {
         case .onboardingBindHostName: "Laufendes dsh"
         case .settingsFieldLaunchCommand: "Eigener Startbefehl (optional)"
         case .settingsFieldLaunchCommandPrompt: "leer lassen für den Standardaufruf"
+        case .tabNewTab: "Neuer Tab"
+        case .tabClose: "Tab schließen"
         }
     }
 
@@ -1137,6 +1153,8 @@ extension Message {
         case .onboardingBindHostName: "dsh en ejecución"
         case .settingsFieldLaunchCommand: "Comando de inicio personalizado (opcional)"
         case .settingsFieldLaunchCommandPrompt: "déjalo vacío para la invocación estándar"
+        case .tabNewTab: "Nueva pestaña"
+        case .tabClose: "Cerrar pestaña"
         }
     }
 }

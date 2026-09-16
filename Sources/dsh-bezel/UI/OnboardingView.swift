@@ -568,7 +568,7 @@ struct OnboardingView: View {
             app.completeOnboarding()
         case .failed(let failure):
             if launchPhase == .starting {
-                launchPhase = .failed(app.failureText(failure))
+                launchPhase = .failed(app.selectedSession.failureText(failure))
             }
         case .idle, .locating, .starting:
             break

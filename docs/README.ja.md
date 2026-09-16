@@ -28,6 +28,8 @@ open "build/DSH Bezel.app"
 
 `swift run dsh-bezel` も動きますが、それは裸の実行ファイルです。bundle がないため `Info.plist` の ATS 例外が適用されず、Cookie と設定の所有が不安定で、macOS は通知を配達しません。実用には `.app` を使ってください。
 
+自前でビルドしたくない場合は、[Releases ページ](https://github.com/cicadas/dsh-bezel/releases/latest) から universal 版の DMG または zip（Apple silicon と Intel の両アーキテクチャ、SHA-256 チェックサム付き）をダウンロードできます。バイナリは ad-hoc 署名のため、開発者証明書のないマシンでは初回起動に右クリック →「開く」が必要な場合があります。
+
 ## 初回起動ガイド
 
 初回起動ではメインウインドウではなく、短いガイドが開きます。すでに DSH プロセスが Web UI をサーブしているかを検出し、その結果に応じて選択肢を出します：

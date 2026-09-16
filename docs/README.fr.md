@@ -28,6 +28,8 @@ open "build/DSH Bezel.app"
 
 `swift run dsh-bezel` fonctionne aussi, mais c'est un exécutable nu : sans bundle, l'exception ATS d'`Info.plist` ne s'applique pas, la propriété des cookies et des préférences est instable, et macOS refuse de livrer des notifications. Pour un vrai usage, prenez le `.app`.
 
+Pas envie de compiler ? La [page des releases](https://github.com/cicadas/dsh-bezel/releases/latest) propose un DMG et un zip universal (Apple silicon et Intel) avec leurs sommes de contrôle SHA-256. Les binaires sont signés ad-hoc : sur une machine sans certificat de développeur, la première ouverture peut exiger un clic droit → Ouvrir.
+
 ## Guide de premier lancement
 
 Le premier lancement ouvre un court guide plutôt que la fenêtre principale. Il détecte si un processus DSH sert déjà une Web UI et propose ce que cette détection permet :

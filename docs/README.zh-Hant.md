@@ -28,6 +28,8 @@ open "build/DSH Bezel.app"
 
 `swift run dsh-bezel` 也行，但那是裸可執行檔：沒有 bundle，`Info.plist` 裡的 ATS 例外不生效，Cookie 與偏好的歸屬不穩定，macOS 也不會投遞通知。正經使用請用 `.app`。
 
+不想自己編譯？可以直接從 [Releases 頁面](https://github.com/cicadas/dsh-bezel/releases/latest) 下載 universal 版的 DMG 或 zip（Apple silicon 與 Intel 雙架構，附 SHA-256 校驗檔）。二進位是 ad-hoc 簽名，在沒有開發者憑證的機器上，首次開啟可能需要右鍵 → 打開。
+
 ## 首次啟動引導
 
 首次啟動開啟的是一段簡短的引導，而不是主視窗。它會偵測是否已有 DSH 程序在伺服 Web UI，並據此給出選項：

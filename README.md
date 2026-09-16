@@ -49,6 +49,11 @@ the ATS exception in `Info.plist` does not apply, cookie/preference ownership is
 unstable, and macOS refuses to deliver notifications. Use the `.app` for real
 work.
 
+Or skip the build: the [Releases page](https://github.com/cicadas/dsh-bezel/releases/latest)
+carries a universal DMG and zip (Apple silicon and Intel) plus their SHA-256
+checksums. The binaries are ad-hoc signed, so the first open on a machine
+without a Developer ID certificate may need a right-click → Open.
+
 ## First-launch guide
 
 The first launch opens a short guide instead of the main window. It detects

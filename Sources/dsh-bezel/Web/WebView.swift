@@ -282,6 +282,29 @@ struct WebView: NSViewRepresentable {
             return nil
         }
 
+        /// Forward file upload requests (e.g. `<input type="file">` triggered by the attachment button)
+        /// to standard macOS file picker (`NSOpenPanel`).
+        func webView(
+            _ webView: WKWebView,
+            runOpenPanelWith parameters: WKOpenPanelParameters,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping ([URL]?) -> Void
+        ) {
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+            panel.canChooseDirectories = parameters.allowsDirectories
+            panel.canChooseFiles = true
+            if let window = webView.window {
+                panel.beginSheetModal(for: window) { result in
+                    completionHandler(result == .OK ? panel.urls : nil)
+                }
+            } else {
+                panel.begin { result in
+                    completionHandler(result == .OK ? panel.urls : nil)
+                }
+            }
+        }
+
         private func report(_ error: Error) {
             let nsError = error as NSError
             // -999 is WebKit's cancellation, raised whenever a load supersedes another.

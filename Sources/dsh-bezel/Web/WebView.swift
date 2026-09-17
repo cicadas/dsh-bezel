@@ -89,7 +89,7 @@ struct WebView: NSViewRepresentable {
     }
 
     /// Drives one WebView and forwards its navigation state to SwiftUI.
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
         var onState: (WebViewState) -> Void
         private weak var webView: WKWebView?
         private var loadedURL: URL?
@@ -245,6 +245,19 @@ struct WebView: NSViewRepresentable {
 
         func webView(
             _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            preferences: WKWebpagePreferences,
+            decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
+        ) {
+            if navigationAction.shouldPerformDownload {
+                decisionHandler(.download, preferences)
+            } else {
+                decisionHandler(.allow, preferences)
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
             decidePolicyFor navigationResponse: WKNavigationResponse,
             decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
         ) {
@@ -256,7 +269,104 @@ struct WebView: NSViewRepresentable {
                 authRejected = true
                 state.problem = .credentialRejected
             }
-            decisionHandler(.allow)
+            if !navigationResponse.canShowMIMEType {
+                decisionHandler(.download)
+            } else {
+                decisionHandler(.allow)
+            }
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+            download.delegate = self
+        }
+
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+            download.delegate = self
+        }
+
+        // MARK: WKDownloadDelegate
+
+        func download(
+            _ download: WKDownload,
+            decideDestinationUsing response: URLResponse,
+            suggestedFilename: String,
+            completionHandler: @escaping (URL?) -> Void
+        ) {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = suggestedFilename
+            panel.canCreateDirectories = true
+            if let window = webView?.window {
+                panel.beginSheetModal(for: window) { result in
+                    completionHandler(result == .OK ? panel.url : nil)
+                }
+            } else {
+                panel.begin { result in
+                    completionHandler(result == .OK ? panel.url : nil)
+                }
+            }
+        }
+
+        // MARK: WKUIDelegate - JS Panels
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptAlertPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping () -> Void
+        ) {
+            let alert = NSAlert()
+            alert.messageText = message
+            alert.addButton(withTitle: "OK")
+            if let window = webView.window {
+                alert.beginSheetModal(for: window) { _ in completionHandler() }
+            } else {
+                alert.runModal()
+                completionHandler()
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptConfirmPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping (Bool) -> Void
+        ) {
+            let alert = NSAlert()
+            alert.messageText = message
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+            if let window = webView.window {
+                alert.beginSheetModal(for: window) { response in
+                    completionHandler(response == .alertFirstButtonReturn)
+                }
+            } else {
+                let response = alert.runModal()
+                completionHandler(response == .alertFirstButtonReturn)
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptTextInputPanelWithPrompt prompt: String,
+            defaultText: String?,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping (String?) -> Void
+        ) {
+            let alert = NSAlert()
+            alert.messageText = prompt
+            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+            input.stringValue = defaultText ?? ""
+            alert.accessoryView = input
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+            if let window = webView.window {
+                alert.beginSheetModal(for: window) { response in
+                    completionHandler(response == .alertFirstButtonReturn ? input.stringValue : nil)
+                }
+            } else {
+                let response = alert.runModal()
+                completionHandler(response == .alertFirstButtonReturn ? input.stringValue : nil)
+            }
         }
 
         /// This app hosts exactly one page: a request for a new window —
